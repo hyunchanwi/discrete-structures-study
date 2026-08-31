@@ -7,7 +7,16 @@ export type StudySection = {
   source: string;
 };
 
-export const sections: StudySection[] = [
+export type StudyWeek = {
+  number: number;
+  title: string;
+  summary: string;
+  status: 'ready' | 'upcoming';
+  sections: StudySection[];
+  memory?: string;
+};
+
+const weekOneSections: StudySection[] = [
   {
     id: 'overview',
     title: '이산구조가 필요한 이유',
@@ -74,6 +83,26 @@ export const sections: StudySection[] = [
   },
 ];
 
+export const weeks: StudyWeek[] = [
+  {
+    number: 1,
+    title: '명제논리와 진리표',
+    summary: '명제, 논리 연산자, 함축과 진리표',
+    status: 'ready',
+    sections: weekOneSections,
+    memory: '조건문은 p가 참이고 q가 거짓일 때만 거짓이다.',
+  },
+  { number: 2, title: '증명 방법과 전략', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+  { number: 3, title: '집합과 함수', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+  { number: 4, title: '알고리즘과 복잡도', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+  { number: 5, title: '귀납법과 재귀', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+  { number: 6, title: '조합론과 점화식', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+  { number: 7, title: '관계와 그래프 이론', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+];
+
+// 기존 콘텐츠 컴포넌트와 외부 소비자가 1주차 섹션을 계속 참조할 수 있게 한다.
+export const sections = weeks[0].sections;
+
 export const operators = [
   { name: '부정', symbol: '¬p', read: 'p가 아니다', truth: 'p가 거짓' },
   { name: '논리곱', symbol: 'p ∧ q', read: 'p이고 q이다', truth: '둘 다 참' },
@@ -81,15 +110,6 @@ export const operators = [
   { name: '배타적 OR', symbol: 'p ⊕ q', read: 'p 또는 q, 둘 다는 아님', truth: '정확히 하나만 참' },
   { name: '함축', symbol: 'p → q', read: 'p이면 q이다', truth: 'T → F만 거짓' },
   { name: '상호조건', symbol: 'p ↔ q', read: 'p일 필요충분조건은 q', truth: '두 값이 같음' },
-];
-
-export const futureUnits = [
-  '증명 방법과 전략',
-  '집합과 함수',
-  '알고리즘과 복잡도',
-  '귀납법과 재귀',
-  '조합론과 점화식',
-  '관계와 그래프 이론',
 ];
 
 export const quizzes = [

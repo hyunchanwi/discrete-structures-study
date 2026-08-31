@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowRight,
   Binary,
   BookOpen,
@@ -16,6 +17,7 @@ import {
   RotateCcw,
   Search,
   Sigma,
+  Lock,
   Sparkles,
   Target,
   X,
@@ -32,18 +34,22 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { futureUnits, operators, quizzes, sections } from '@/src/course-data';
+import { operators, quizzes, weeks, type StudySection } from '@/src/course-data';
 import {
   type BinaryOperator,
+  completedWeekNumbers,
   evaluateBinary,
   explainBinary,
   gradeQuiz,
-  parseProgress,
+  parseWeeklyProgress,
+  resolveStudyLocation,
   searchStudySections,
 } from '@/src/logic-utils';
 
-const STORAGE_KEY = 'discrete-structures-progress-v1';
-const sectionIds = sections.map((section) => section.id);
+const STORAGE_KEY = 'discrete-structures-progress-v2';
+const LEGACY_STORAGE_KEY = 'discrete-structures-progress-v1';
+const firstReadyWeek = weeks.find((week) => week.status === 'ready' && week.sections.length > 0) ?? weeks[0];
+const sections = firstReadyWeek.sections;
 const operatorLabels: { id: BinaryOperator; label: string; symbol: string }[] = [
   { id: 'and', label: 'AND', symbol: '∧' },
   { id: 'or', label: 'OR', symbol: '∨' },
@@ -51,6 +57,13 @@ const operatorLabels: { id: BinaryOperator; label: string; symbol: string }[] = 
   { id: 'implies', label: '함축', symbol: '→' },
   { id: 'iff', label: 'IFF', symbol: '↔' },
 ];
+
+type PendingNavigation = {
+  week: number;
+  section: string;
+  focus: boolean;
+  behavior: ScrollBehavior;
+};
 
 function TruthValueButton({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -75,10 +88,10 @@ function TruthValueButton({ label, value, onChange }: { label: string; value: bo
   );
 }
 
-function SectionList({ activeId, completed, onSelect }: { activeId: string; completed: Set<string>; onSelect: (id: string) => void }) {
+function SectionList({ items, activeId, completed, onSelect }: { items: StudySection[]; activeId: string; completed: Set<string>; onSelect: (id: string) => void }) {
   return (
-    <nav aria-label="1주차 학습 목차" className="space-y-1.5">
-      {sections.map((section, index) => {
+    <nav aria-label="현재 주차 학습 목차" className="space-y-1.5">
+      {items.map((section, index) => {
         const active = section.id === activeId;
         return (
           <button
@@ -102,9 +115,41 @@ function SectionList({ activeId, completed, onSelect }: { activeId: string; comp
   );
 }
 
+function WeekList({ activeWeek, completedWeeks, onSelect }: { activeWeek: number; completedWeeks: Set<number>; onSelect: (week: number) => void }) {
+  return (
+    <nav aria-label="전체 주차 목록" className="space-y-1.5">
+      {weeks.map((week) => {
+        const ready = week.status === 'ready' && week.sections.length > 0;
+        const active = week.number === activeWeek;
+        return (
+          <button
+            key={week.number}
+            type="button"
+            disabled={!ready}
+            onClick={() => ready && onSelect(week.number)}
+            aria-current={active ? 'page' : undefined}
+            aria-label={`${week.number}주차 ${week.title}${ready ? '' : ', 자료 준비 중'}`}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${active ? 'bg-primary text-primary-foreground shadow-sm' : ready ? 'text-foreground hover:bg-muted' : 'cursor-not-allowed text-muted-foreground opacity-70'}`}
+          >
+            <span className={`grid size-8 shrink-0 place-items-center rounded-xl border text-xs font-black ${active ? 'border-white/35' : 'border-border bg-background'}`}>
+              {completedWeeks.has(week.number) ? <Check className="size-4" aria-hidden="true" /> : String(week.number).padStart(2, '0')}
+            </span>
+            <span className="min-w-0 flex-1">
+              <strong className="block truncate text-sm">{week.title}</strong>
+              <small className={`mt-0.5 block truncate text-[11px] ${active ? 'text-white/75' : 'text-muted-foreground'}`}>{ready ? week.summary : '자료 준비 중'}</small>
+            </span>
+            {!ready && <Lock className="size-3.5 shrink-0" aria-hidden="true" />}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function Home() {
+  const [activeWeek, setActiveWeek] = useState(firstReadyWeek.number);
   const [activeId, setActiveId] = useState('overview');
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [completedByWeek, setCompletedByWeek] = useState<Record<string, string[]>>({});
   const [query, setQuery] = useState('');
   const [mobileQueryOpen, setMobileQueryOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -116,102 +161,183 @@ export default function Home() {
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
   const [feedback, setFeedback] = useState<Record<string, 'unanswered' | 'correct' | 'incorrect'>>({});
   const [hydrated, setHydrated] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const searchRootRef = useRef<HTMLDivElement>(null);
 
-  const searchResults = useMemo(() => searchStudySections(sections, query), [query]);
-  const progressValue = Math.round((completed.size / sections.length) * 100);
-  const activeIndex = Math.max(0, sections.findIndex((section) => section.id === activeId));
+  const activeWeekData = weeks.find((week) => week.number === activeWeek) ?? firstReadyWeek;
+  const currentSections = activeWeekData.sections;
+  const currentSectionIds = currentSections.map((section) => section.id);
+  const completed = useMemo(() => new Set(completedByWeek[String(activeWeek)] ?? []), [activeWeek, completedByWeek]);
+  const progressState = useMemo(() => ({ version: 2 as const, completedByWeek, lastWeek: activeWeek, lastSection: activeId }), [activeId, activeWeek, completedByWeek]);
+  const completedWeeks = useMemo(() => new Set(completedWeekNumbers(progressState, weeks)), [progressState]);
+  const currentWeekComplete = currentSections.length > 0 && currentSectionIds.every((id) => completed.has(id));
+  const searchResults = searchStudySections(currentSections, query);
+  const progressValue = Math.round((completed.size / Math.max(1, currentSections.length)) * 100);
+  const activeIndex = Math.max(0, currentSections.findIndex((section) => section.id === activeId));
   const truthResult = evaluateBinary(operator, p, q);
   const truthRows = [[true, true], [true, false], [false, true], [false, false]] as const;
 
   useEffect(() => {
-    let saved = parseProgress(null, sectionIds);
+    let saved = parseWeeklyProgress(null, weeks);
     try {
-      saved = parseProgress(window.localStorage.getItem(STORAGE_KEY), sectionIds);
+      const currentRaw = window.localStorage.getItem(STORAGE_KEY);
+      const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      saved = parseWeeklyProgress(currentRaw, weeks, legacyRaw);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     } catch {
       // Private browsing or a storage policy can block access; in-memory study still works.
     }
     const params = new URLSearchParams(window.location.search);
-    const requested = params.get('section');
-    const initial = requested && sectionIds.includes(requested) ? requested : saved.lastSection;
+    const location = resolveStudyLocation(
+      params.get('week'),
+      window.location.hash,
+      weeks,
+      saved,
+      params.get('section'),
+    );
+    if (location.shouldNormalize) replaceStudyUrl(location.week, location.section);
     window.requestAnimationFrame(() => {
-      setCompleted(new Set(saved.completed));
-      setActiveId(initial);
+      setPendingNavigation({ week: location.week, section: location.section, focus: false, behavior: 'auto' });
+      setCompletedByWeek(saved.completedByWeek);
+      setActiveWeek(location.week);
+      setActiveId(location.section);
       setHydrated(true);
-      document.getElementById(initial)?.scrollIntoView({ block: 'start' });
     });
 
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) return;
-      const next = parseProgress(event.newValue, sectionIds);
-      setCompleted(new Set(next.completed));
+      if (event.key !== STORAGE_KEY && event.key !== LEGACY_STORAGE_KEY) return;
+      let currentRaw = event.key === STORAGE_KEY ? event.newValue : null;
+      let legacyRaw = event.key === LEGACY_STORAGE_KEY ? event.newValue : null;
+      try {
+        if (event.key !== STORAGE_KEY) currentRaw = window.localStorage.getItem(STORAGE_KEY);
+        if (event.key !== LEGACY_STORAGE_KEY) legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      } catch {
+        // The storage event's own value is still usable when the other key cannot be read.
+      }
+      const next = parseWeeklyProgress(currentRaw, weeks, legacyRaw);
+      setPendingNavigation({ week: next.lastWeek, section: next.lastSection, focus: false, behavior: 'auto' });
+      setCompletedByWeek(next.completedByWeek);
+      setActiveWeek(next.lastWeek);
       setActiveId(next.lastSection);
+      replaceStudyUrl(next.lastWeek, next.lastSection);
     };
     const onPopState = () => {
-      const id = new URLSearchParams(window.location.search).get('section');
-      if (!id || !sectionIds.includes(id)) return;
-      setActiveId(id);
-      document.getElementById(id)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+      let nextProgress = parseWeeklyProgress(null, weeks);
+      try {
+        nextProgress = parseWeeklyProgress(window.localStorage.getItem(STORAGE_KEY), weeks, window.localStorage.getItem(LEGACY_STORAGE_KEY));
+      } catch {
+        // Fall back to the first available week when storage cannot be read.
+      }
+      const params = new URLSearchParams(window.location.search);
+      const next = resolveStudyLocation(params.get('week'), window.location.hash, weeks, nextProgress, params.get('section'));
+      if (next.shouldNormalize) replaceStudyUrl(next.week, next.section);
+      setPendingNavigation({ week: next.week, section: next.section, focus: false, behavior: preferredScrollBehavior() });
+      setActiveWeek(next.week);
+      setActiveId(next.section);
     };
-    const observer = new IntersectionObserver((entries) => {
-      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      const id = visible?.target.id;
-      if (!id || !sectionIds.includes(id)) return;
-      setActiveId(id);
-      const url = new URL(window.location.href);
-      url.searchParams.set('section', id);
-      window.history.replaceState({}, '', url);
-    }, { rootMargin: '-20% 0px -65% 0px', threshold: [0.1, 0.5] });
-    document.querySelectorAll('.section-anchor').forEach((element) => observer.observe(element));
     window.addEventListener('storage', onStorage);
     window.addEventListener('popstate', onPopState);
     return () => {
-      observer.disconnect();
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('popstate', onPopState);
     };
   }, []);
 
-  function persist(nextCompleted: Set<string>, lastSection: string) {
+  useEffect(() => {
+    if (!pendingNavigation || pendingNavigation.week !== activeWeek || pendingNavigation.section !== activeId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(pendingNavigation.section);
+      target?.scrollIntoView({ behavior: pendingNavigation.behavior, block: 'start' });
+      if (pendingNavigation.focus) target?.focus({ preventScroll: true });
+      setPendingNavigation(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeId, activeWeek, pendingNavigation]);
+
+  useEffect(() => {
+    const validIds = new Set(currentSections.map((section) => section.id));
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      const id = visible?.target.id;
+      if (!id || !validIds.has(id)) return;
+      setActiveId(id);
+      replaceStudyUrl(activeWeek, id);
+      try {
+        const current = parseWeeklyProgress(window.localStorage.getItem(STORAGE_KEY), weeks, window.localStorage.getItem(LEGACY_STORAGE_KEY));
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, lastWeek: activeWeek, lastSection: id }));
+      } catch {
+        // Scrolling and URL navigation remain usable without persistent storage.
+      }
+    }, { rootMargin: '-20% 0px -65% 0px', threshold: [0.1, 0.5] });
+    document.querySelectorAll('.section-anchor').forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [activeWeek, currentSections]);
+
+  function persist(nextCompletedByWeek: Record<string, string[]>, lastWeek: number, lastSection: string) {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...nextCompleted], lastSection }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, completedByWeek: nextCompletedByWeek, lastWeek, lastSection }));
     } catch {
       // Keep the current session usable when storage is unavailable or full.
     }
   }
 
-  function navigateTo(id: string) {
-    if (!sectionIds.includes(id)) return;
+  function navigateTo(id: string, focusContent = false) {
+    if (!currentSectionIds.includes(id)) return;
     setActiveId(id);
     const url = new URL(window.location.href);
-    url.searchParams.set('section', id);
+    url.searchParams.set('week', String(activeWeek));
+    url.hash = id;
     window.history.pushState({}, '', url);
-    persist(completed, id);
-    document.getElementById(id)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+    persist(completedByWeek, activeWeek, id);
+    const target = document.getElementById(id);
+    target?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+    if (focusContent) window.requestAnimationFrame(() => target?.focus({ preventScroll: true }));
   }
 
   function toggleComplete(id: string) {
     const next = new Set(completed);
     if (next.has(id)) next.delete(id); else next.add(id);
-    setCompleted(next);
-    persist(next, activeId);
+    const nextByWeek = { ...completedByWeek, [String(activeWeek)]: [...next] };
+    setCompletedByWeek(nextByWeek);
+    persist(nextByWeek, activeWeek, activeId);
+  }
+
+  function toggleWeekComplete() {
+    const next = currentWeekComplete ? [] : currentSectionIds;
+    const nextByWeek = { ...completedByWeek, [String(activeWeek)]: next };
+    setCompletedByWeek(nextByWeek);
+    persist(nextByWeek, activeWeek, activeId);
+  }
+
+  function selectWeek(weekNumber: number) {
+    const week = weeks.find((item) => item.number === weekNumber && item.status === 'ready' && item.sections.length > 0);
+    if (!week) return;
+    const id = week.sections[0].id;
+    setActiveWeek(week.number);
+    setActiveId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('week', String(week.number));
+    url.hash = id;
+    window.history.pushState({}, '', url);
+    persist(completedByWeek, week.number, id);
+    setPendingNavigation({ week: week.number, section: id, focus: true, behavior: preferredScrollBehavior() });
   }
 
   function resetProgress() {
-    const empty = new Set<string>();
-    setCompleted(empty);
+    setCompletedByWeek({});
     setFeedback({});
     setAnswers({});
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       // The in-memory reset still succeeds when storage removal is blocked.
     }
-    setActiveId('overview');
-    const url = new URL(window.location.href);
-    url.searchParams.set('section', 'overview');
-    window.history.replaceState({}, '', url);
-    document.getElementById('overview')?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
+    const firstSection = firstReadyWeek.sections[0].id;
+    setPendingNavigation({ week: firstReadyWeek.number, section: firstSection, focus: false, behavior: preferredScrollBehavior() });
+    setActiveId(firstSection);
+    setActiveWeek(firstReadyWeek.number);
+    replaceStudyUrl(firstReadyWeek.number, firstSection);
   }
 
   function submitQuiz(id: string, answer: number) {
@@ -283,10 +409,18 @@ export default function Home() {
             </SheetTrigger>
             <SheetContent side="left" className="w-[88%] max-w-sm p-0">
               <SheetHeader className="border-b p-5">
-                <SheetTitle>1주차 학습 목차</SheetTitle>
-                <SheetDescription>완료한 개념에는 체크가 표시돼.</SheetDescription>
+                <SheetTitle>이산구조 학습 지도</SheetTitle>
+                <SheetDescription>주차를 고른 뒤 그 안의 개념으로 이동해.</SheetDescription>
               </SheetHeader>
-              <div className="overflow-y-auto p-4"><SectionList activeId={activeId} completed={completed} onSelect={(id) => { navigateTo(id); setNavOpen(false); }} /><Button variant="ghost" size="sm" onClick={() => { resetProgress(); setNavOpen(false); }} className="mt-5 w-full justify-start text-muted-foreground"><RotateCcw /> 진도 초기화</Button></div>
+              <div className="overflow-y-auto p-4">
+                <a href="https://hyunchanwi.github.io/study-hub/" className="mb-4 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold hover:bg-muted"><ArrowLeft className="size-4" /> Study Hub로 돌아가기</a>
+                <p className="mb-2 px-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">전체 주차</p>
+                <WeekList activeWeek={activeWeek} completedWeeks={completedWeeks} onSelect={(week) => { selectWeek(week); setNavOpen(false); }} />
+                <div className="my-5 h-px bg-border" />
+                <p className="mb-2 px-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{activeWeek}주차 세부 목차</p>
+                <SectionList items={currentSections} activeId={activeId} completed={completed} onSelect={(id) => { setNavOpen(false); navigateTo(id, true); }} />
+                <Button variant="ghost" size="sm" onClick={() => { resetProgress(); setNavOpen(false); }} className="mt-5 w-full justify-start text-muted-foreground"><RotateCcw /> 진도 초기화</Button>
+              </div>
             </SheetContent>
           </Sheet>
 
@@ -299,22 +433,23 @@ export default function Home() {
           </div>
           <div className="ml-auto hidden w-full max-w-md md:block">{searchBox()}</div>
           <Button variant="outline" size="icon" className="md:hidden" onClick={() => setMobileQueryOpen((value) => !value)} aria-expanded={mobileQueryOpen} aria-label="개념 검색 열기"><Search /></Button>
-          <span className="hidden rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 text-xs font-bold text-primary sm:inline">1주차</span>
+          <span className="hidden rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 text-xs font-bold text-primary sm:inline" aria-live="polite">전체 {hydrated ? completedWeeks.size : 0}/{weeks.length}주 완료</span>
         </div>
         {mobileQueryOpen && <div className="border-t px-4 py-3 md:hidden">{searchBox(true)}</div>}
       </header>
 
       <div className="mx-auto grid max-w-[1440px] grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,820px)_270px]">
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] overflow-y-auto border-r border-border/80 p-5 lg:block">
+          <a href="https://hyunchanwi.github.io/study-hub/" className="mb-5 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold hover:bg-muted"><ArrowLeft className="size-4" /> Study Hub로 돌아가기</a>
           <div className="mb-5 rounded-2xl border bg-card p-4 shadow-sm">
-            <Progress value={hydrated ? progressValue : 0} className="gap-2">
-              <ProgressLabel>1주차 진도</ProgressLabel>
-              <span className="ml-auto text-sm font-black tabular-nums text-primary">{hydrated ? progressValue : 0}%</span>
+            <Progress value={hydrated ? (completedWeeks.size / weeks.length) * 100 : 0} className="gap-2">
+              <ProgressLabel>전체 학습 진도</ProgressLabel>
+              <span className="ml-auto text-sm font-black tabular-nums text-primary">{hydrated ? completedWeeks.size : 0}/{weeks.length}</span>
             </Progress>
-            <p className="mt-2 text-xs text-muted-foreground">{completed.size}/{sections.length}개 개념 완료</p>
+            <p className="mt-2 text-xs text-muted-foreground">완료한 주차를 기준으로 계산해.</p>
           </div>
-          <p className="mb-3 px-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">학습 지도</p>
-          <SectionList activeId={activeId} completed={completed} onSelect={navigateTo} />
+          <p className="mb-3 px-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">전체 주차</p>
+          <WeekList activeWeek={activeWeek} completedWeeks={completedWeeks} onSelect={selectWeek} />
           <Button variant="ghost" size="sm" onClick={resetProgress} className="mt-5 w-full justify-start text-muted-foreground"><RotateCcw /> 진도 초기화</Button>
         </aside>
 
@@ -323,23 +458,26 @@ export default function Home() {
             <section className="rounded-[28px] border border-border bg-card/96 p-6 shadow-[0_22px_70px_-42px_rgba(33,42,102,.45)] sm:p-8">
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-black text-accent-foreground"><BookOpen className="size-3.5" /> 오늘의 학습</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-xs font-black text-accent-foreground"><BookOpen className="size-3.5" /> WEEK {String(activeWeek).padStart(2, '0')} · 학습 가능</span>
                   <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-4xl">명제논리, 참과 거짓의 언어</h1>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">문장을 명제로 바꾸고, 논리 연산자의 규칙을 진리표로 직접 확인해 보자.</p>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-xs font-medium text-muted-foreground"><Clock3 className="size-4 text-primary" /> 약 35분</div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-xs font-medium text-muted-foreground"><Clock3 className="size-4 text-primary" /> 약 35분</div>
+                  <Button type="button" size="sm" variant={currentWeekComplete ? 'secondary' : 'outline'} onClick={toggleWeekComplete} aria-pressed={currentWeekComplete}><Target /> {currentWeekComplete ? '주차 완료됨' : '주차 완료 표시'}</Button>
+                </div>
               </div>
               <Progress value={hydrated ? progressValue : 0} className="rounded-xl bg-muted/65 p-3 lg:hidden">
-                <ProgressLabel>1주차 진행률</ProgressLabel>
+                <ProgressLabel>{activeWeek}주차 진행률</ProgressLabel>
                 <span className="ml-auto text-sm font-black tabular-nums text-primary">{hydrated ? progressValue : 0}%</span>
               </Progress>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button size="lg" className="h-11 rounded-xl px-4" onClick={() => navigateTo(completed.size ? activeId : 'proposition')}>{completed.size ? '이어서 공부하기' : '1주차 시작하기'} <ArrowRight /></Button>
+                <Button size="lg" className="h-11 rounded-xl px-4" onClick={() => navigateTo(completed.size ? activeId : 'proposition')}>{completed.size ? '이어서 공부하기' : `${activeWeek}주차 시작하기`} <ArrowRight /></Button>
                 <Button variant="outline" size="lg" className="h-11 rounded-xl px-4" onClick={() => navigateTo('truth-table')}><Binary /> 진리표 실습</Button>
               </div>
             </section>
 
-            <article id="overview" className="section-anchor section-card">
+            <article id="overview" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="overview" completed={completed} onToggle={toggleComplete} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <ConceptCard icon={<Binary />} title="디지털 정보의 바닥">컴퓨터는 정보를 0과 1의 유한한 조합으로 저장하고 처리한다.</ConceptCard>
@@ -348,7 +486,7 @@ export default function Home() {
               <p className="source-note">출처: {sections[0].source}</p>
             </article>
 
-            <article id="proposition" className="section-anchor section-card">
+            <article id="proposition" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="proposition" completed={completed} onToggle={toggleComplete} />
               <div className="definition-box"><span>정확한 정의</span><strong>명제는 참 또는 거짓 중 정확히 하나로 판정되는 선언문이다.</strong></div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -361,7 +499,7 @@ export default function Home() {
               <p className="source-note">출처: {sections[1].source}</p>
             </article>
 
-            <article id="operators" className="section-anchor section-card">
+            <article id="operators" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="operators" completed={completed} onToggle={toggleComplete} />
               <div className="overflow-x-auto rounded-2xl border">
                 <table className="w-full min-w-[620px] text-left text-sm">
@@ -373,7 +511,7 @@ export default function Home() {
               <p className="source-note">출처: {sections[2].source}</p>
             </article>
 
-            <article id="implication" className="section-anchor section-card">
+            <article id="implication" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="implication" completed={completed} onToggle={toggleComplete} />
               <div className="formula-card"><span>p → q</span><strong>≡</strong><span>¬p ∨ q</span></div>
               <p className="leading-7 text-muted-foreground">조건문을 “p가 일어나면 q도 일어나야 한다”는 약속으로 생각하자. 약속이 깨지는 경우는 p가 참인데 q가 거짓인 단 한 경우다.</p>
@@ -385,7 +523,7 @@ export default function Home() {
               <p className="source-note">출처: {sections[3].source}</p>
             </article>
 
-            <article id="truth-table" className="section-anchor section-card">
+            <article id="truth-table" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="truth-table" completed={completed} onToggle={toggleComplete} />
               <ol className="grid gap-2 text-sm sm:grid-cols-2">{['변수마다 열을 만든다','2ⁿ개 조합을 빠짐없이 적는다','중간 계산 열을 만든다','괄호와 우선순위대로 계산한다'].map((step, index) => <li key={step} className="flex gap-3 rounded-xl bg-muted/70 p-3"><span className="font-mono font-black text-primary">0{index + 1}</span>{step}</li>)}</ol>
               <div className="rounded-3xl border bg-[#171a37] p-5 text-white sm:p-6">
@@ -400,14 +538,14 @@ export default function Home() {
               <p className="source-note">출처: {sections[4].source}</p>
             </article>
 
-            <article id="applications" className="section-anchor section-card">
+            <article id="applications" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="applications" completed={completed} onToggle={toggleComplete} />
               <div className="rounded-2xl border bg-background p-5"><p className="text-xs font-black uppercase tracking-[.12em] text-primary">자연어 → 논리식</p><p className="mt-3 text-sm leading-6">키가 4피트 미만이고 16세를 초과하지 않은 사람은 롤러코스터를 탈 수 없다.</p><div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3"><span><strong className="text-foreground">q</strong>: 탈 수 있다</span><span><strong className="text-foreground">r</strong>: 4피트 미만이다</span><span><strong className="text-foreground">s</strong>: 16세를 초과한다</span></div><div className="mt-4 formula-card"><span>(r ∧ ¬s)</span><strong>→</strong><span>¬q</span></div></div>
               <div className="rounded-2xl border bg-background p-5"><p className="text-xs font-black uppercase tracking-[.12em] text-primary">시스템 명세 일관성</p><div className="mt-3 grid gap-2 font-mono text-sm sm:grid-cols-3"><span className="rounded-lg bg-muted p-2 text-center">P ∨ Q</span><span className="rounded-lg bg-muted p-2 text-center">¬P</span><span className="rounded-lg bg-muted p-2 text-center">P → Q</span></div><p className="mt-3 text-sm text-muted-foreground">P=F, Q=T라는 조합이 세 식을 모두 참으로 만들므로 일관적이다. 여기에 ¬Q를 더하면 가능한 조합이 사라진다.</p></div>
               <p className="source-note">출처: {sections[5].source}</p>
             </article>
 
-            <article id="bits-circuits" className="section-anchor section-card">
+            <article id="bits-circuits" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="bits-circuits" completed={completed} onToggle={toggleComplete} />
               <div className="grid gap-4 sm:grid-cols-2"><div className="rounded-2xl bg-[#171a37] p-5 font-mono text-sm text-indigo-100"><p className="text-white">F ↔ 0　T ↔ 1</p><p className="mt-4">1011 | 0110 = <strong className="text-amber-300">1111</strong></p><p>1011 & 0110 = <strong className="text-amber-300">0010</strong></p><p>1011 ^ 0110 = <strong className="text-amber-300">1101</strong></p></div><div className="rounded-2xl border bg-background p-5"><Code2 className="size-5 text-primary" /><p className="mt-3 text-sm leading-6"><code>!</code>, <code>&&</code>, <code>||</code>는 논리값 연산에, <code>~</code>, <code>&</code>, <code>|</code>, <code>^</code>는 비트 단위 연산에 사용한다.</p></div></div>
               <div className="formula-card"><span>(p ∧ ¬q)</span><strong>∨</strong><span>¬r</span></div>
@@ -415,7 +553,7 @@ export default function Home() {
               <p className="source-note">출처: {sections[6].source}</p>
             </article>
 
-            <article id="review" className="section-anchor section-card">
+            <article id="review" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="review" completed={completed} onToggle={toggleComplete} />
               <div className="grid gap-3 sm:grid-cols-3">{[['∨ vs ⊕','OR는 둘 다 참도 포함. XOR은 하나만 참.'],['→','T → F일 때만 거짓.'],['대우','p → q ≡ ¬q → ¬p']].map(([title, body]) => <div key={title} className="rounded-2xl bg-accent/70 p-4"><strong className="font-mono text-primary">{title}</strong><p className="mt-2 text-sm leading-5">{body}</p></div>)}</div>
               <div className="space-y-4">{quizzes.map((quiz, quizIndex) => { const state = feedback[quiz.id]; return <div key={quiz.id} className="rounded-2xl border bg-background p-5"><p className="text-xs font-black text-primary">CHECK {quizIndex + 1}</p><h3 className="mt-2 font-bold" id={`${quiz.id}-prompt`}>{quiz.prompt}</h3><fieldset className="mt-3 grid gap-2"><legend className="sr-only">{quiz.prompt}</legend>{quiz.choices.map((choice, index) => <button key={choice} aria-pressed={answers[quiz.id] === index} type="button" onClick={() => { setAnswers((current) => ({ ...current, [quiz.id]: index })); setFeedback((current) => { const next = { ...current }; delete next[quiz.id]; return next; }); }} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm ${answers[quiz.id] === index ? 'border-primary bg-primary/8' : 'hover:bg-muted'}`}><span className={`grid size-5 place-items-center rounded-full border ${answers[quiz.id] === index ? 'border-primary bg-primary text-primary-foreground' : ''}`}>{answers[quiz.id] === index && <Check className="size-3" />}</span>{choice}</button>)}</fieldset><Button type="button" size="sm" className="mt-3" onClick={() => submitQuiz(quiz.id, quiz.answer)}>정답 확인</Button>{state && <div aria-live="polite" className={`mt-3 rounded-xl p-3 text-sm ${state === 'correct' ? 'bg-emerald-100 text-emerald-900' : state === 'incorrect' ? 'bg-rose-100 text-rose-900' : 'bg-amber-100 text-amber-900'}`}>{state === 'unanswered' ? '답을 먼저 선택해 줘.' : <><strong>{state === 'correct' ? '정답!' : '다시 생각해 보자.'}</strong> {quiz.explanation}</>}</div>}</div>; })}</div>
@@ -423,24 +561,35 @@ export default function Home() {
             </article>
 
             <div className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
-              <Button variant="outline" disabled={activeIndex === 0} onClick={() => navigateTo(sections[Math.max(0, activeIndex - 1)].id)}>이전</Button>
-              <p className="hidden text-sm text-muted-foreground sm:block">{completed.size === sections.length ? '1주차 완료! 잘했어.' : `${sections.length - completed.size}개 개념이 남았어.`}</p>
-              <Button onClick={() => navigateTo(sections[Math.min(sections.length - 1, activeIndex + 1)].id)} disabled={activeIndex === sections.length - 1}>다음 <ArrowRight /></Button>
+              <Button variant="outline" disabled={activeIndex === 0} onClick={() => navigateTo(currentSections[Math.max(0, activeIndex - 1)].id)}>이전</Button>
+              <p className="hidden text-sm text-muted-foreground sm:block">{currentWeekComplete ? `${activeWeek}주차 완료! 잘했어.` : `${currentSections.length - completed.size}개 개념이 남았어.`}</p>
+              <Button onClick={() => navigateTo(currentSections[Math.min(currentSections.length - 1, activeIndex + 1)].id)} disabled={activeIndex === currentSections.length - 1}>다음 <ArrowRight /></Button>
             </div>
           </div>
         </section>
 
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] overflow-y-auto border-l border-border/80 p-6 xl:block">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">이번 주 목표</p>
-          <ol className="mt-4 space-y-4 text-sm leading-5">{['명제와 비명제를 구분한다','여섯 논리 연산자를 설명한다','함축의 대우를 작성한다','진리표를 단계적으로 만든다','자연어를 논리식으로 바꾼다'].map((goal, index) => <li key={goal} className="flex gap-3"><span className="font-mono text-primary">0{index + 1}</span><span>{goal}</span></li>)}</ol>
-          <div className="my-6 h-px bg-border" />
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">전체 과목 지도</p>
-          <div className="mt-4 space-y-3"><div className="rounded-xl border border-primary/30 bg-primary/8 p-3 text-sm font-bold text-primary">1주차 · 논리와 증명</div>{futureUnits.map((unit) => <div key={unit} className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><Circle className="size-3" />{unit}<span className="ml-auto text-[10px]">자료 준비 중</span></div>)}</div>
-          <div className="mt-6 rounded-2xl bg-[#171a37] p-4 text-white"><Sparkles className="size-5 text-amber-300" /><p className="mt-3 text-sm font-bold">오늘의 기억 문장</p><p className="mt-2 text-xs leading-5 text-indigo-100">조건문은 p가 참이고 q가 거짓일 때만 거짓이다.</p></div>
+          <div className="mb-6 rounded-2xl border bg-card p-4 shadow-sm">
+            <Progress value={hydrated ? progressValue : 0} className="gap-2">
+              <ProgressLabel>{activeWeek}주차 진도</ProgressLabel>
+              <span className="ml-auto text-sm font-black tabular-nums text-primary">{completed.size}/{currentSections.length}</span>
+            </Progress>
+          </div>
+          <p className="mb-3 px-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">현재 주차 목차</p>
+          <SectionList items={currentSections} activeId={activeId} completed={completed} onSelect={navigateTo} />
+          {activeWeekData.memory && <div className="mt-6 rounded-2xl bg-[#171a37] p-4 text-white"><Sparkles className="size-5 text-amber-300" /><p className="mt-3 text-sm font-bold">오늘의 기억 문장</p><p className="mt-2 text-xs leading-5 text-indigo-100">{activeWeekData.memory}</p></div>}
         </aside>
       </div>
     </main>
   );
+}
+
+function replaceStudyUrl(week: number, section: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('section');
+  url.searchParams.set('week', String(week));
+  url.hash = section;
+  window.history.replaceState({}, '', url);
 }
 
 function preferredScrollBehavior(): ScrollBehavior {
