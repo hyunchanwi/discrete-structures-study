@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildCompoundTruthRows,
+  buildImplicationRows,
   completedWeekNumbers,
   evaluateBinary,
   explainBinary,
@@ -130,6 +132,43 @@ void test('검색은 관련 섹션을 찾고 결과 없음 상태를 구분한�
   assert.equal(searchStudySections(sections, '대우').length, 1);
   assert.equal(searchStudySections(sections, '그래프').length, 0);
   assert.equal(searchStudySections([{ title: '명제', summary: '', searchText: '' }], '명제').length, 1);
+});
+
+void test('업데이트된 1주차 핵심 용어는 관련 섹션으로 검색된다', () => {
+  const weekOneSections = weeks.find((week) => week.number === 1)?.sections ?? [];
+  const cases = [
+    ['연속', ['overview']],
+    ['영화', ['proposition']],
+    ['학생증', ['operators']],
+    ['biconditional', ['implication']],
+    ['공허하게 참', ['implication']],
+    ['Harry 쇼핑', ['truth-table']],
+    ['사실 분리', ['applications']],
+    ['신호 흐름', ['bits-circuits']],
+    ['시험 포인트 행 수', ['review']],
+  ] as const;
+  for (const [query, expectedIds] of cases) {
+    assert.deepEqual(searchStudySections(weekOneSections, query).map((section) => section.id), expectedIds);
+  }
+});
+
+void test('사이트에 표시하는 함축과 3변수 복합 진리표를 식에서 계산한다', () => {
+  assert.deepEqual(buildImplicationRows(), [
+    { p: true, q: true, result: true },
+    { p: true, q: false, result: false },
+    { p: false, q: true, result: true },
+    { p: false, q: false, result: true },
+  ]);
+  assert.deepEqual(buildCompoundTruthRows(), [
+    { p: false, q: false, r: false, pOrQ: false, notR: true, result: true },
+    { p: false, q: false, r: true, pOrQ: false, notR: false, result: true },
+    { p: false, q: true, r: false, pOrQ: true, notR: true, result: true },
+    { p: false, q: true, r: true, pOrQ: true, notR: false, result: false },
+    { p: true, q: false, r: false, pOrQ: true, notR: true, result: true },
+    { p: true, q: false, r: true, pOrQ: true, notR: false, result: false },
+    { p: true, q: true, r: false, pOrQ: true, notR: true, result: true },
+    { p: true, q: true, r: true, pOrQ: true, notR: false, result: false },
+  ]);
 });
 
 void test('모든 이항 연산자의 네 진리표 행을 계산한다', () => {

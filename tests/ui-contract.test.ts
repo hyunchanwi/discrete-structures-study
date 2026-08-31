@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { weeks } from '../src/course-data.ts';
+
 void test('모바일 너비에서 드로어 탐색·닫기·진도 초기화 진입점을 제공한다', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   assert.match(page, /SheetContent[\s\S]*side="left"/);
@@ -63,4 +65,28 @@ void test('관찰자·완료 판정·초기화·기억 카드는 현재 주차 �
   assert.match(page, /currentSectionIds\.every\(\(id\) => completed\.has\(id\)\)/);
   assert.match(page, /firstReadyWeek\.sections\[0\]\.id/);
   assert.match(page, /activeWeekData\.memory &&/);
+});
+
+void test('1주차 사이트용 노트의 새 추론 과정과 예제를 포함한다', async () => {
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /연속적인 값/);
+  assert.match(page, /p가 거짓이면 공허하게 참/);
+  assert.match(page, /P only if Q/);
+  assert.match(page, /q → p ≡ ¬p → ¬q/);
+  assert.match(page, /\(p → q\) ∧ \(q → p\)/);
+  assert.match(page, /연산자 우선순위/);
+  assert.match(page, /3변수 = 2³ = 8행/);
+  assert.match(page, /\(P ∨ Q\) → ¬R/);
+  assert.match(page, /진단 메시지가 버퍼에 저장/);
+  assert.match(page, /논리식에서 q와 r의 NOT 출력을 찾는다/);
+  assert.match(page, /<caption className="sr-only">/);
+  assert.match(page, /scope="col"/);
+});
+
+void test('콘텐츠 갱신 후에도 기존 8개 섹션 ID와 순서를 유지한다', async () => {
+  const expected = ['overview', 'proposition', 'operators', 'implication', 'truth-table', 'applications', 'bits-circuits', 'review'];
+  const weekOne = weeks.find((week) => week.number === 1);
+  assert.deepEqual(weekOne?.sections.map((section) => section.id), expected);
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.deepEqual([...page.matchAll(/<article id="([^"]+)"/g)].map((match) => match[1]), expected);
 });

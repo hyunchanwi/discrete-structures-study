@@ -34,6 +34,23 @@ export function evaluateBinary(operator: BinaryOperator, p: boolean, q: boolean)
   }
 }
 
+export function buildImplicationRows() {
+  const inputs = [[true, true], [true, false], [false, true], [false, false]] as const;
+  return inputs.map(([p, q]) => ({ p, q, result: evaluateBinary('implies', p, q) }));
+}
+
+export function buildCompoundTruthRows() {
+  const inputs = [
+    [false, false, false], [false, false, true], [false, true, false], [false, true, true],
+    [true, false, false], [true, false, true], [true, true, false], [true, true, true],
+  ] as const;
+  return inputs.map(([p, q, r]) => {
+    const pOrQ = evaluateBinary('or', p, q);
+    const notR = !r;
+    return { p, q, r, pOrQ, notR, result: evaluateBinary('implies', pOrQ, notR) };
+  });
+}
+
 export function explainBinary(operator: BinaryOperator, p: boolean, q: boolean) {
   const result = evaluateBinary(operator, p, q);
   if (operator === 'implies') {

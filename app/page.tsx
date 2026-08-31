@@ -37,6 +37,8 @@ import {
 import { operators, quizzes, weeks, type StudySection } from '@/src/course-data';
 import {
   type BinaryOperator,
+  buildCompoundTruthRows,
+  buildImplicationRows,
   completedWeekNumbers,
   evaluateBinary,
   explainBinary,
@@ -57,6 +59,14 @@ const operatorLabels: { id: BinaryOperator; label: string; symbol: string }[] = 
   { id: 'implies', label: '함축', symbol: '→' },
   { id: 'iff', label: 'IFF', symbol: '↔' },
 ];
+const implicationRows = buildImplicationRows();
+const implicationMeanings = [
+  'p와 q가 모두 참이므로 조건을 만족한다.',
+  'p는 참이지만 q가 거짓이라 약속을 위반한다.',
+  'p가 거짓이므로 ¬p ∨ q가 참이다.',
+  'p가 거짓이므로 ¬p ∨ q가 참이다.',
+] as const;
+const compoundTruthRows = buildCompoundTruthRows();
 
 type PendingNavigation = {
   week: number;
@@ -479,6 +489,18 @@ export default function Home() {
 
             <article id="overview" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="overview" completed={completed} onToggle={toggleComplete} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border bg-background p-5">
+                  <p className="text-xs font-black uppercase tracking-[.12em] text-primary">연속적인 값</p>
+                  <p className="mt-4 font-mono text-sm">실수 구간 [0, 1]</p>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">실수 구간에는 끊김 없이 모든 중간값이 포함된다.</p>
+                </div>
+                <div className="rounded-2xl border bg-background p-5">
+                  <p className="text-xs font-black uppercase tracking-[.12em] text-primary">이산적인 값</p>
+                  <ol className="mt-4 flex gap-2 font-mono text-sm" aria-label="서로 구분되는 정수 0, 1, 2, 3">{[0, 1, 2, 3].map((value) => <li key={value} className="grid size-8 place-items-center rounded-full bg-muted">{value}</li>)}</ol>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">사람을 3.7명이라고 세지 않듯 각 대상을 하나씩 구분하고 셀 수 있다.</p>
+                </div>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <ConceptCard icon={<Binary />} title="디지털 정보의 바닥">컴퓨터는 정보를 0과 1의 유한한 조합으로 저장하고 처리한다.</ConceptCard>
                 <ConceptCard icon={<Target />} title="구조와 관계를 보는 법">비밀번호 개수, 최단 경로, 암호화처럼 서로 구분되는 대상과 관계를 연구한다.</ConceptCard>
@@ -494,6 +516,8 @@ export default function Home() {
                 <Example verdict="명제 · F" text="2 + 2 = 3" good />
                 <Example verdict="명제 아님" text="지금 몇 시인가?" />
                 <Example verdict="명제 아님" text="x + 1 = 2" />
+                <Example verdict="명제 아님" text="문을 닫아라!" />
+                <Example verdict="명제 아님 · 판단 기준이 주관적" text="이 영화는 재미있다" />
               </div>
               <div className="tip-box"><Lightbulb /> <p><strong>모르는 것과 결정되지 않는 것은 다르다.</strong> 큰 수가 소수인지 당장 몰라도 원칙적으로 참·거짓이 정해지면 명제다.</p></div>
               <p className="source-note">출처: {sections[1].source}</p>
@@ -508,6 +532,10 @@ export default function Home() {
                 </table>
               </div>
               <div className="warning-box"><strong>OR와 XOR를 구분!</strong><span>p ∨ q는 둘 다 참이어도 참이지만, p ⊕ q는 정확히 하나만 참이어야 한다.</span></div>
+              <div className="rounded-2xl border bg-background p-5">
+                <p className="text-xs font-black uppercase tracking-[.12em] text-primary">학생증과 비밀번호로 읽기</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">p를 “사용자가 학생증을 가지고 있다”, q를 “사용자가 비밀번호를 알고 있다”로 두면 AND는 둘 다 필요하고, OR는 하나 이상, XOR은 정확히 하나만 만족해야 한다.</p>
+              </div>
               <p className="source-note">출처: {sections[2].source}</p>
             </article>
 
@@ -515,24 +543,58 @@ export default function Home() {
               <SectionHeader sectionId="implication" completed={completed} onToggle={toggleComplete} />
               <div className="formula-card"><span>p → q</span><strong>≡</strong><span>¬p ∨ q</span></div>
               <p className="leading-7 text-muted-foreground">조건문을 “p가 일어나면 q도 일어나야 한다”는 약속으로 생각하자. 약속이 깨지는 경우는 p가 참인데 q가 거짓인 단 한 경우다.</p>
+              <div className="overflow-x-auto rounded-2xl border">
+                <table className="w-full min-w-[650px] text-left text-sm">
+                  <caption className="sr-only">조건문 p → q의 네 가지 진릿값과 해석</caption>
+                  <thead className="bg-muted text-xs text-muted-foreground"><tr><th scope="col" className="p-3">p</th><th scope="col" className="p-3">q</th><th scope="col" className="p-3">p → q</th><th scope="col" className="p-3">논리식으로 읽기</th></tr></thead>
+                  <tbody className="divide-y">{implicationRows.map((row, index) => <tr key={`${row.p}-${row.q}`}><td className="p-3 font-mono">{row.p ? 'T' : 'F'}</td><td className="p-3 font-mono">{row.q ? 'T' : 'F'}</td><td className={`p-3 font-black ${row.result ? 'text-emerald-700' : 'text-rose-700'}`}>{row.result ? 'T' : 'F'}</td><td className="p-3 text-muted-foreground">{implicationMeanings[index]}</td></tr>)}</tbody>
+                </table>
+              </div>
+              <div className="tip-box"><Lightbulb /> <p><strong>p가 거짓이면 공허하게 참이다.</strong> 전제가 발생하지 않아 약속을 깬 상황이 아니기 때문이다. 논리적 함축은 진릿값의 관계이며 현실의 인과관계를 반드시 뜻하지는 않는다.</p></div>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border bg-background p-4"><p className="text-xs font-black text-primary">필요·충분조건</p><p className="mt-2 text-sm leading-6"><strong>p는 q의 충분조건</strong>이고, <strong>q는 p의 필요조건</strong>이다.</p></div>
+                <div className="rounded-2xl border bg-background p-4"><p className="text-xs font-black text-primary">필요·충분조건</p><p className="mt-2 text-sm leading-6"><strong>p는 q의 충분조건</strong>이고, <strong>q는 p의 필요조건</strong>이다.</p><p className="mt-2 text-xs leading-5 text-muted-foreground"><code>P only if Q</code>, <code>Q if P</code>, <code>Q is necessary for P</code>는 모두 P → Q로 읽는다.</p></div>
                 <div className="rounded-2xl border bg-background p-4"><p className="text-xs font-black text-primary">항상 기억할 동치</p><p className="mt-2 font-mono text-lg font-black">p → q ≡ ¬q → ¬p</p><p className="mt-1 text-xs text-muted-foreground">원래 명제와 대우는 항상 동치</p></div>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[['역','q → p'],['이','¬p → ¬q'],['대우','¬q → ¬p'],['원문','p → q']].map(([name, formula]) => <div key={name} className="rounded-xl bg-muted p-3 text-center"><span className="block text-xs text-muted-foreground">{name}</span><strong className="mt-1 block font-mono">{formula}</strong></div>)}</div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border bg-background p-4"><p className="text-xs font-black text-primary">동치 묶음</p><p className="mt-2 font-mono text-sm font-black">p → q ≡ ¬q → ¬p</p><p className="mt-1 font-mono text-sm font-black">q → p ≡ ¬p → ¬q</p><p className="mt-2 text-xs text-muted-foreground">원문≡대우, 역≡이. 원문과 역은 일반적으로 동치가 아니다.</p></div>
+                <div className="rounded-2xl border bg-background p-4"><p className="text-xs font-black text-primary">방향을 반례로 확인</p><p className="mt-2 text-sm leading-6">“4의 배수이면 짝수”는 참이지만 “짝수이면 4의 배수”는 6 때문에 거짓이다.</p></div>
+              </div>
+              <div className="rounded-2xl border bg-accent/55 p-5">
+                <p className="text-xs font-black uppercase tracking-[.12em] text-primary">상호조건문</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-sm font-black"><span>p ↔ q</span><span>≡</span><span>(p → q) ∧ (q → p)</span><span>≡</span><span>¬(p ⊕ q)</span></div>
+                <p className="mt-3 text-sm text-muted-foreground">양방향 조건이 모두 성립해야 하므로 p와 q의 진릿값이 같을 때 참이다.</p>
+              </div>
               <p className="source-note">출처: {sections[3].source}</p>
             </article>
 
             <article id="truth-table" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="truth-table" completed={completed} onToggle={toggleComplete} />
               <ol className="grid gap-2 text-sm sm:grid-cols-2">{['변수마다 열을 만든다','2ⁿ개 조합을 빠짐없이 적는다','중간 계산 열을 만든다','괄호와 우선순위대로 계산한다'].map((step, index) => <li key={step} className="flex gap-3 rounded-xl bg-muted/70 p-3"><span className="font-mono font-black text-primary">0{index + 1}</span>{step}</li>)}</ol>
+              <div className="rounded-2xl border bg-background p-5">
+                <p className="text-xs font-black uppercase tracking-[.12em] text-primary">연산자 우선순위</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 font-mono text-lg font-black"><span>¬</span><ChevronRight className="size-4 text-muted-foreground" /><span>∧</span><ChevronRight className="size-4 text-muted-foreground" /><span>∨</span><ChevronRight className="size-4 text-muted-foreground" /><span>→</span><ChevronRight className="size-4 text-muted-foreground" /><span>↔</span></div>
+                <p className="mt-3 text-sm text-muted-foreground">복잡한 식에서는 우선순위만 믿지 말고 괄호로 연산 범위를 분명히 하자.</p>
+              </div>
               <div className="rounded-3xl border bg-[#171a37] p-5 text-white sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[.14em] text-indigo-200">Interactive lab</p><h3 className="mt-1 text-xl font-black">진리표 실험실</h3></div><span className="rounded-full bg-white/10 px-3 py-1 font-mono text-sm">p {operatorLabels.find((item) => item.id === operator)?.symbol} q</span></div>
                 <fieldset className="mt-5 flex flex-wrap gap-2"><legend className="sr-only">논리 연산자 선택</legend>{operatorLabels.map((item) => <Button key={item.id} type="button" aria-pressed={operator === item.id} size="sm" variant={operator === item.id ? 'secondary' : 'ghost'} onClick={() => setOperator(item.id)} className={operator !== item.id ? 'text-indigo-100 hover:bg-white/10 hover:text-white' : ''}>{item.symbol} {item.label}</Button>)}</fieldset>
                 <div className="mt-4 flex flex-wrap items-center gap-3"><TruthValueButton label="p" value={p} onChange={setP} /><TruthValueButton label="q" value={q} onChange={setQ} /><ArrowRight className="hidden text-indigo-300 sm:block" /><div className={`grid size-16 place-items-center rounded-2xl text-2xl font-black ${truthResult ? 'bg-emerald-400 text-emerald-950' : 'bg-rose-400 text-rose-950'}`}>{truthResult ? 'T' : 'F'}</div></div>
                 <p className="mt-4 min-h-10 rounded-xl bg-white/8 p-3 text-sm leading-5 text-indigo-100" aria-live="polite">{explainBinary(operator, p, q)}</p>
                 <div className="mt-4 overflow-hidden rounded-xl border border-white/15">
-                  <table className="w-full text-center text-xs"><thead className="bg-white/10 text-indigo-100"><tr><th className="p-2">p</th><th>q</th><th>{operatorLabels.find((item) => item.id === operator)?.symbol}</th></tr></thead><tbody className="divide-y divide-white/10">{truthRows.map(([rowP, rowQ]) => <tr key={`${rowP}-${rowQ}`}><td className="p-2">{rowP ? 'T' : 'F'}</td><td>{rowQ ? 'T' : 'F'}</td><td className="font-black text-amber-300">{evaluateBinary(operator, rowP, rowQ) ? 'T' : 'F'}</td></tr>)}</tbody></table>
+                  <table className="w-full text-center text-xs"><caption className="sr-only">선택한 이항 논리 연산자의 진리표</caption><thead className="bg-white/10 text-indigo-100"><tr><th scope="col" className="p-2">p</th><th scope="col">q</th><th scope="col">{operatorLabels.find((item) => item.id === operator)?.symbol}</th></tr></thead><tbody className="divide-y divide-white/10">{truthRows.map(([rowP, rowQ]) => <tr key={`${rowP}-${rowQ}`}><td className="p-2">{rowP ? 'T' : 'F'}</td><td>{rowQ ? 'T' : 'F'}</td><td className="font-black text-amber-300">{evaluateBinary(operator, rowP, rowQ) ? 'T' : 'F'}</td></tr>)}</tbody></table>
+                </div>
+              </div>
+              <div className="rounded-2xl border bg-background p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[.12em] text-primary">3변수 종합 예제</p><h3 className="mt-2 font-bold">(P ∨ Q) → ¬R</h3></div><span className="rounded-full bg-muted px-3 py-1 text-xs font-bold">3변수 = 2³ = 8행</span></div>
+                <div className="mt-3 grid gap-1 text-sm leading-6 text-muted-foreground"><p><strong className="text-foreground">P</strong>: Harry의 집에 간다.</p><p><strong className="text-foreground">Q</strong>: 시골에 간다.</p><p><strong className="text-foreground">R</strong>: 쇼핑하러 간다.</p></div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">포괄적 OR이므로 P와 Q 중 하나 이상이 참이면서 R도 참인 `(P ∨ Q) ∧ R`일 때만 전체 조건문이 거짓이다.</p>
+                <div className="mt-4 overflow-x-auto rounded-xl border">
+                  <table className="w-full min-w-[620px] text-center text-xs">
+                    <caption className="sr-only">복합명제 (P ∨ Q) → ¬R의 여덟 가지 진릿값</caption>
+                    <thead className="bg-muted text-muted-foreground"><tr><th scope="col" className="p-2">P</th><th scope="col">Q</th><th scope="col">R</th><th scope="col">P ∨ Q</th><th scope="col">¬R</th><th scope="col">(P ∨ Q) → ¬R</th></tr></thead>
+                    <tbody className="divide-y">{compoundTruthRows.map((row) => <tr key={`${row.p}-${row.q}-${row.r}`}><td className="p-2">{row.p ? 'T' : 'F'}</td><td>{row.q ? 'T' : 'F'}</td><td>{row.r ? 'T' : 'F'}</td><td>{row.pOrQ ? 'T' : 'F'}</td><td>{row.notR ? 'T' : 'F'}</td><td className={`font-black ${row.result ? 'text-emerald-700' : 'text-rose-700'}`}>{row.result ? 'T' : 'F'}</td></tr>)}</tbody>
+                  </table>
                 </div>
               </div>
               <p className="source-note">출처: {sections[4].source}</p>
@@ -540,8 +602,9 @@ export default function Home() {
 
             <article id="applications" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="applications" completed={completed} onToggle={toggleComplete} />
+              <ol className="grid gap-2 text-sm sm:grid-cols-2">{['문장을 독립적인 사실로 나눈다','각 사실에 p, q, r을 붙인다','only if·필요조건 등 방향과 부정 범위를 판별한다','접속어를 기호로 바꾸고 괄호로 범위를 확정한다'].map((step, index) => <li key={step} className="flex gap-3 rounded-xl bg-muted/70 p-3"><span className="font-mono font-black text-primary">0{index + 1}</span>{step}</li>)}</ol>
               <div className="rounded-2xl border bg-background p-5"><p className="text-xs font-black uppercase tracking-[.12em] text-primary">자연어 → 논리식</p><p className="mt-3 text-sm leading-6">키가 4피트 미만이고 16세를 초과하지 않은 사람은 롤러코스터를 탈 수 없다.</p><div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3"><span><strong className="text-foreground">q</strong>: 탈 수 있다</span><span><strong className="text-foreground">r</strong>: 4피트 미만이다</span><span><strong className="text-foreground">s</strong>: 16세를 초과한다</span></div><div className="mt-4 formula-card"><span>(r ∧ ¬s)</span><strong>→</strong><span>¬q</span></div></div>
-              <div className="rounded-2xl border bg-background p-5"><p className="text-xs font-black uppercase tracking-[.12em] text-primary">시스템 명세 일관성</p><div className="mt-3 grid gap-2 font-mono text-sm sm:grid-cols-3"><span className="rounded-lg bg-muted p-2 text-center">P ∨ Q</span><span className="rounded-lg bg-muted p-2 text-center">¬P</span><span className="rounded-lg bg-muted p-2 text-center">P → Q</span></div><p className="mt-3 text-sm text-muted-foreground">P=F, Q=T라는 조합이 세 식을 모두 참으로 만들므로 일관적이다. 여기에 ¬Q를 더하면 가능한 조합이 사라진다.</p></div>
+              <div className="rounded-2xl border bg-background p-5"><p className="text-xs font-black uppercase tracking-[.12em] text-primary">시스템 명세 일관성</p><div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"><span><strong className="text-foreground">P</strong>: 진단 메시지가 버퍼에 저장된다.</span><span><strong className="text-foreground">Q</strong>: 진단 메시지가 재전송된다.</span></div><div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><span className="rounded-lg bg-muted p-2"><code>P ∨ Q</code><small className="mt-1 block text-muted-foreground">저장되거나 재전송된다.</small></span><span className="rounded-lg bg-muted p-2"><code>¬P</code><small className="mt-1 block text-muted-foreground">버퍼에 저장되지 않는다.</small></span><span className="rounded-lg bg-muted p-2"><code>P → Q</code><small className="mt-1 block text-muted-foreground">저장되면 재전송된다.</small></span></div><p className="mt-3 text-sm text-muted-foreground">P=F, Q=T라는 조합이 세 식을 모두 참으로 만들므로 일관적이다. 여기에 ¬Q를 더하면 가능한 조합이 사라진다.</p></div>
               <p className="source-note">출처: {sections[5].source}</p>
             </article>
 
@@ -549,13 +612,15 @@ export default function Home() {
               <SectionHeader sectionId="bits-circuits" completed={completed} onToggle={toggleComplete} />
               <div className="grid gap-4 sm:grid-cols-2"><div className="rounded-2xl bg-[#171a37] p-5 font-mono text-sm text-indigo-100"><p className="text-white">F ↔ 0　T ↔ 1</p><p className="mt-4">1011 | 0110 = <strong className="text-amber-300">1111</strong></p><p>1011 & 0110 = <strong className="text-amber-300">0010</strong></p><p>1011 ^ 0110 = <strong className="text-amber-300">1101</strong></p></div><div className="rounded-2xl border bg-background p-5"><Code2 className="size-5 text-primary" /><p className="mt-3 text-sm leading-6"><code>!</code>, <code>&&</code>, <code>||</code>는 논리값 연산에, <code>~</code>, <code>&</code>, <code>|</code>, <code>^</code>는 비트 단위 연산에 사용한다.</p></div></div>
               <div className="formula-card"><span>(p ∧ ¬q)</span><strong>∨</strong><span>¬r</span></div>
-              <p className="text-sm leading-6 text-muted-foreground">강의자료의 조합회로는 q와 r을 각각 부정한 뒤 AND와 OR 게이트를 연결해 위 식을 계산한다.</p>
+              <ol className="grid gap-2 text-sm sm:grid-cols-2">{['논리식에서 q와 r의 NOT 출력을 찾는다','p와 ¬q가 만나는 AND 연결을 확인한다','¬r이 OR로 직접 들어가는 경로를 찾는다','두 경로의 출력을 OR에서 결합해 해석한다'].map((step, index) => <li key={step} className="flex gap-3 rounded-xl bg-muted/70 p-3"><span className="font-mono font-black text-primary">0{index + 1}</span>{step}</li>)}</ol>
+              <p className="text-sm leading-6 text-muted-foreground">이 목록은 회로를 읽는 순서다. 실제 조합회로의 게이트들은 연결 구조에 따라 함께 반응하고, 전파 지연 뒤 최종 출력 <code>(p ∧ ¬q) ∨ ¬r</code>이 안정된다.</p>
               <p className="source-note">출처: {sections[6].source}</p>
             </article>
 
             <article id="review" tabIndex={-1} className="section-anchor section-card">
               <SectionHeader sectionId="review" completed={completed} onToggle={toggleComplete} />
-              <div className="grid gap-3 sm:grid-cols-3">{[['∨ vs ⊕','OR는 둘 다 참도 포함. XOR은 하나만 참.'],['→','T → F일 때만 거짓.'],['대우','p → q ≡ ¬q → ¬p']].map(([title, body]) => <div key={title} className="rounded-2xl bg-accent/70 p-4"><strong className="font-mono text-primary">{title}</strong><p className="mt-2 text-sm leading-5">{body}</p></div>)}</div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[['∨ vs ⊕','OR는 둘 다 참도 포함. XOR은 하나만 참.'],['→','T → F일 때만 거짓.'],['대우','p → q ≡ ¬q → ¬p'],['only if','P only if Q는 P → Q.'],['우선순위','¬ > ∧ > ∨ > → > ↔'],['진리표 행 수','명제변수가 n개면 2ⁿ행.']].map(([title, body]) => <div key={title} className="rounded-2xl bg-accent/70 p-4"><strong className="font-mono text-primary">{title}</strong><p className="mt-2 text-sm leading-5">{body}</p></div>)}</div>
+              <div className="rounded-2xl border bg-background p-5"><p className="text-xs font-black uppercase tracking-[.12em] text-primary">시험 체크리스트</p><ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">{['명제와 비명제를 이유와 함께 구분','여섯 연산자의 참 조건 작성','역·이·대우와 동치 관계 판별','자연어를 논리식으로 번역','시스템 명세의 만족 조합 찾기','논리회로를 식과 연산 순서로 해석'].map((item) => <li key={item} className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />{item}</li>)}</ul></div>
               <div className="space-y-4">{quizzes.map((quiz, quizIndex) => { const state = feedback[quiz.id]; return <div key={quiz.id} className="rounded-2xl border bg-background p-5"><p className="text-xs font-black text-primary">CHECK {quizIndex + 1}</p><h3 className="mt-2 font-bold" id={`${quiz.id}-prompt`}>{quiz.prompt}</h3><fieldset className="mt-3 grid gap-2"><legend className="sr-only">{quiz.prompt}</legend>{quiz.choices.map((choice, index) => <button key={choice} aria-pressed={answers[quiz.id] === index} type="button" onClick={() => { setAnswers((current) => ({ ...current, [quiz.id]: index })); setFeedback((current) => { const next = { ...current }; delete next[quiz.id]; return next; }); }} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm ${answers[quiz.id] === index ? 'border-primary bg-primary/8' : 'hover:bg-muted'}`}><span className={`grid size-5 place-items-center rounded-full border ${answers[quiz.id] === index ? 'border-primary bg-primary text-primary-foreground' : ''}`}>{answers[quiz.id] === index && <Check className="size-3" />}</span>{choice}</button>)}</fieldset><Button type="button" size="sm" className="mt-3" onClick={() => submitQuiz(quiz.id, quiz.answer)}>정답 확인</Button>{state && <div aria-live="polite" className={`mt-3 rounded-xl p-3 text-sm ${state === 'correct' ? 'bg-emerald-100 text-emerald-900' : state === 'incorrect' ? 'bg-rose-100 text-rose-900' : 'bg-amber-100 text-amber-900'}`}>{state === 'unanswered' ? '답을 먼저 선택해 줘.' : <><strong>{state === 'correct' ? '정답!' : '다시 생각해 보자.'}</strong> {quiz.explanation}</>}</div>}</div>; })}</div>
               <p className="source-note">출처: {sections[7].source}</p>
             </article>
