@@ -30,8 +30,8 @@ const weekOneSections: StudySection[] = [
     title: '명제와 진릿값',
     eyebrow: '1.1 Propositional Logic',
     summary: '참 또는 거짓으로 확정되는 선언문만 명제가 된다.',
-    searchText: '명제 proposition 선언문 참 거짓 진릿값 질문 명령 변수 주관적 영화',
-    source: '1주차 강의자료 슬라이드 4-5',
+    searchText: '명제 proposition 선언문 참 거짓 진릿값 질문 명령 변수 주관적 영화 객관적 소수 이순신 명량해전 맷 데이먼',
+    source: '1주차 강의자료 슬라이드 4-5 + 공유 학습 기록',
   },
   {
     id: 'operators',
@@ -46,8 +46,8 @@ const weekOneSections: StudySection[] = [
     title: '함축과 역·이·대우',
     eyebrow: '조건문의 핵심',
     summary: 'p → q를 약속으로 이해하고 필요·충분조건과 대우의 동치를 연결한다.',
-    searchText: '함축 조건문 약속 공허한 참 공허하게 참 인과 충분조건 sufficient 필요조건 necessary only if converse inverse contrapositive 역 이 대우 동치 상호조건문 biconditional',
-    source: '1주차 강의자료 슬라이드 11-15',
+    searchText: '함축 조건문 약속 공허한 참 공허하게 참 인과 충분조건 출발 꼬리 sufficient 필요조건 도착 머리 necessary only if converse inverse contrapositive 역 이 대우 동치 상호조건문 biconditional',
+    source: '1주차 강의자료 슬라이드 11-15 + 공유 학습 기록',
   },
   {
     id: 'truth-table',
@@ -70,16 +70,16 @@ const weekOneSections: StudySection[] = [
     title: '비트 연산과 논리회로',
     eyebrow: '컴퓨터공학 연결',
     summary: '참·거짓을 1·0에 대응시켜 비트 연산과 논리 게이트를 해석한다.',
-    searchText: '비트 bit boolean c java not and or xor 논리회로 게이트 조합회로 신호 흐름 중간 결과 출력',
-    source: '1주차 강의자료 슬라이드 18, 23-24',
+    searchText: '비트 bit boolean 부울대수 c java not and or xor 논리회로 게이트 조합회로 신호 흐름 중간 결과 출력 xor 분해 곱의 합 sum of products sop 논리합 덧셈',
+    source: '1주차 강의자료 슬라이드 18, 23-24 + 공유 학습 기록',
   },
   {
     id: 'review',
     title: '시험 직전 점검',
     eyebrow: '회상과 퀴즈',
-    summary: '헷갈리는 지점을 다시 떠올리고 세 문제로 이해도를 확인한다.',
-    searchText: '시험 포인트 퀴즈 복습 오답 함정 기억카드 only if 우선순위 행 수 번역 명세 회로',
-    source: '1주차 강의자료 전체 종합',
+    summary: '헷갈리는 지점을 다시 떠올리고 네 문제로 이해도를 확인한다.',
+    searchText: '시험 포인트 퀴즈 복습 오답 함정 기억카드 only if 우선순위 행 수 번역 명세 회로 xor 분해 부울 표기 곱의 합',
+    source: '1주차 강의자료 전체 + 공유 학습 기록 종합',
   },
 ];
 
@@ -133,5 +133,12 @@ export const quizzes = [
     choices: ['T', 'F'],
     answer: 0,
     explanation: 'XOR은 두 값 중 정확히 하나만 참일 때 참이다.',
+  },
+  {
+    id: 'q4',
+    prompt: '부울대수의 A̅B + AB̅에서 +는 무엇을 뜻할까?',
+    choices: ['산술 덧셈', '논리합 OR', '논리곱 AND', '부정 NOT'],
+    answer: 1,
+    explanation: '부울대수의 +는 산술 덧셈이 아니라 논리합 OR를 뜻한다.',
   },
 ];

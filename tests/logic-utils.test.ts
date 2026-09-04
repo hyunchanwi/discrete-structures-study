@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildConditionalRelationRows,
   buildCompoundTruthRows,
+  buildImplicationEquivalenceRows,
   buildImplicationRows,
+  buildXorDecompositionRows,
   completedWeekNumbers,
   evaluateBinary,
   explainBinary,
@@ -142,14 +145,43 @@ void test('업데이트된 1주차 핵심 용어는 관련 섹션으로 검색�
     ['학생증', ['operators']],
     ['biconditional', ['implication']],
     ['공허하게 참', ['implication']],
+    ['출발 꼬리', ['implication']],
     ['Harry 쇼핑', ['truth-table']],
     ['사실 분리', ['applications']],
     ['신호 흐름', ['bits-circuits']],
+    ['곱의 합', ['bits-circuits', 'review']],
+    ['부울대수', ['bits-circuits']],
     ['시험 포인트 행 수', ['review']],
   ] as const;
   for (const [query, expectedIds] of cases) {
     assert.deepEqual(searchStudySections(weekOneSections, query).map((section) => section.id), expectedIds);
   }
+});
+
+void test('함축 동치와 역·이·대우 관계를 식에서 계산한다', () => {
+  assert.deepEqual(buildImplicationEquivalenceRows(), [
+    { p: true, q: true, implication: true, notP: false, notPOrQ: true },
+    { p: true, q: false, implication: false, notP: false, notPOrQ: false },
+    { p: false, q: true, implication: true, notP: true, notPOrQ: true },
+    { p: false, q: false, implication: true, notP: true, notPOrQ: true },
+  ]);
+  assert.deepEqual(buildConditionalRelationRows(), [
+    { p: true, q: true, original: true, converse: true, inverse: true, contrapositive: true },
+    { p: true, q: false, original: false, converse: true, inverse: true, contrapositive: false },
+    { p: false, q: true, original: true, converse: false, inverse: false, contrapositive: true },
+    { p: false, q: false, original: true, converse: true, inverse: true, contrapositive: true },
+  ]);
+});
+
+void test('XOR의 AND·OR·NOT 분해식이 XOR 결과와 일치한다', () => {
+  const rows = buildXorDecompositionRows();
+  assert.deepEqual(rows, [
+    { p: true, q: true, pAndNotQ: false, notPAndQ: false, decomposed: false, xor: false },
+    { p: true, q: false, pAndNotQ: true, notPAndQ: false, decomposed: true, xor: true },
+    { p: false, q: true, pAndNotQ: false, notPAndQ: true, decomposed: true, xor: true },
+    { p: false, q: false, pAndNotQ: false, notPAndQ: false, decomposed: false, xor: false },
+  ]);
+  assert.ok(rows.every((row) => row.decomposed === row.xor));
 });
 
 void test('사이트에 표시하는 함축과 3변수 복합 진리표를 식에서 계산한다', () => {

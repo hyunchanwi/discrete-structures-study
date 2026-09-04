@@ -79,6 +79,15 @@ void test('1주차 사이트용 노트의 새 추론 과정과 예제를 포함�
   assert.match(page, /\(P ∨ Q\) → ¬R/);
   assert.match(page, /진단 메시지가 버퍼에 저장/);
   assert.match(page, /논리식에서 q와 r의 NOT 출력을 찾는다/);
+  assert.match(page, /객관적으로 정해져 있는가/);
+  assert.match(page, /명량해전 승리 날에 비가 왔다/);
+  assert.match(page, /충분조건 p ─────→ 필요조건 q/);
+  assert.match(page, /원문≡대우 · 역≡이/);
+  assert.match(page, /입력 A\s+01 1011 0110/);
+  assert.match(page, /p ⊕ q/);
+  assert.match(page, /곱의 합\(SOP\)/);
+  assert.match(page, /NOT 2개 · AND 2개 · OR 1개/);
+  assert.match(page, /<code>\+<\/code>는 숫자 덧셈이 아니라/);
   assert.match(page, /<caption className="sr-only">/);
   assert.match(page, /scope="col"/);
 });

@@ -39,6 +39,40 @@ export function buildImplicationRows() {
   return inputs.map(([p, q]) => ({ p, q, result: evaluateBinary('implies', p, q) }));
 }
 
+export function buildImplicationEquivalenceRows() {
+  return buildImplicationRows().map(({ p, q, result }) => {
+    const notP = !p;
+    return { p, q, implication: result, notP, notPOrQ: evaluateBinary('or', notP, q) };
+  });
+}
+
+export function buildConditionalRelationRows() {
+  return buildImplicationRows().map(({ p, q, result }) => ({
+    p,
+    q,
+    original: result,
+    converse: evaluateBinary('implies', q, p),
+    inverse: evaluateBinary('implies', !p, !q),
+    contrapositive: evaluateBinary('implies', !q, !p),
+  }));
+}
+
+export function buildXorDecompositionRows() {
+  const inputs = [[true, true], [true, false], [false, true], [false, false]] as const;
+  return inputs.map(([p, q]) => {
+    const pAndNotQ = evaluateBinary('and', p, !q);
+    const notPAndQ = evaluateBinary('and', !p, q);
+    return {
+      p,
+      q,
+      pAndNotQ,
+      notPAndQ,
+      decomposed: evaluateBinary('or', pAndNotQ, notPAndQ),
+      xor: evaluateBinary('xor', p, q),
+    };
+  });
+}
+
 export function buildCompoundTruthRows() {
   const inputs = [
     [false, false, false], [false, false, true], [false, true, false], [false, true, true],
