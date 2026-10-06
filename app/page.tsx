@@ -1,5 +1,6 @@
 'use client';
 import { ClaudeStudyNotes, StudyNotesJump } from './claude-study-notes';
+import { WeeklyStudy } from './weekly-study';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -471,6 +472,7 @@ export default function Home() {
 
         <section className="logic-grid min-w-0 px-4 py-7 sm:px-8 sm:py-10">
           <div className="mx-auto max-w-[820px] space-y-6">
+            {activeWeek !== 1 ? <><Button type="button" variant={currentWeekComplete ? 'secondary' : 'outline'} onClick={toggleWeekComplete} aria-pressed={currentWeekComplete}><Target /> {currentWeekComplete ? '주차 완료됨' : `${activeWeek}주차 완료 표시`}</Button><WeeklyStudy week={activeWeek} /></> : <>
             <section className="rounded-[28px] border border-border bg-card/96 p-6 shadow-[0_22px_70px_-42px_rgba(33,42,102,.45)] sm:p-8">
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -674,6 +676,7 @@ export default function Home() {
               <p className="hidden text-sm text-muted-foreground sm:block">{currentWeekComplete ? `${activeWeek}주차 완료! 잘했어.` : `${currentSections.length - completed.size}개 개념이 남았어.`}</p>
               <Button onClick={() => navigateTo(currentSections[Math.min(currentSections.length - 1, activeIndex + 1)].id)} disabled={activeIndex === currentSections.length - 1}>다음 <ArrowRight /></Button>
             </div>
+            </>}
           </div>
         </section>
 
@@ -689,7 +692,7 @@ export default function Home() {
           {activeWeekData.memory && <div className="mt-6 rounded-2xl bg-[#171a37] p-4 text-white"><Sparkles className="size-5 text-amber-300" /><p className="mt-3 text-sm font-bold">오늘의 기억 문장</p><p className="mt-2 text-xs leading-5 text-indigo-100">{activeWeekData.memory}</p></div>}
         </aside>
       </div>
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-7"><ClaudeStudyNotes initialScope="lec1" /></div>
+      {activeWeek === 1 && <div className="mx-auto max-w-[1440px] px-4 sm:px-7"><ClaudeStudyNotes initialScope="lec1" locked /></div>}
     </main>
   );
 }
