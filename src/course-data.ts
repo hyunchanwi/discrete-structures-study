@@ -1,3 +1,6 @@
+import { weeklyCatalog } from './weekly-catalog.ts';
+import { lectureSummaries } from './lecture-summaries.ts';
+
 export type StudySection = {
   id: string;
   title: string;
@@ -92,10 +95,20 @@ export const weeks: StudyWeek[] = [
     sections: weekOneSections,
     memory: '조건문은 p가 참이고 q가 거짓일 때만 거짓이다.',
   },
-  { number: 2, title: '증명 방법과 전략', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
-  { number: 3, title: '집합과 함수', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
-  { number: 4, title: '알고리즘과 복잡도', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
-  { number: 5, title: '귀납법과 재귀', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
+  ...weeklyCatalog.filter((week) => week.number >= 2).map((week): StudyWeek => ({
+    number: week.number,
+    title: week.title,
+    summary: week.summary,
+    status: 'ready',
+    sections: [
+      { id: `week${week.number}-overview`, title: '자료와 주차 진도', eyebrow: `WEEK ${week.number}`, summary: week.summary, searchText: week.evidence, source: week.materials.join(' / ') },
+      ...lectureSummaries.filter((lecture) => week.lectureIds.includes(lecture.id)).map((lecture) => ({
+        id: `learning-${lecture.id}`, title: lecture.title, eyebrow: `WEEK ${week.number}`, summary: lecture.overview,
+        searchText: lecture.sections.map((section) => `${section.title} ${section.paragraphs.join(' ')} ${section.formula}`).join(' '), source: lecture.location,
+      })),
+    ],
+    memory: week.summary,
+  })),
   { number: 6, title: '조합론과 점화식', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
   { number: 7, title: '관계와 그래프 이론', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
 ];
