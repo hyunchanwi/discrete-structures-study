@@ -75,8 +75,8 @@ void test('v2 진도는 주차별 유효 섹션만 복원하고 손상된 위치
   assert.deepEqual(restored, {
     version: 2,
     completedByWeek: { 1: ['overview'] },
-    lastWeek: 1,
-    lastSection: 'overview',
+    lastWeek: 2,
+    lastSection: 'week2-overview',
   });
 });
 
@@ -102,7 +102,7 @@ void test('직접 링크와 저장 위치를 해석하고 잘못된 주차·해�
   const saved = parseWeeklyProgress('{"version":2,"completedByWeek":{},"lastWeek":1,"lastSection":"truth-table"}', weeks);
   assert.deepEqual(resolveStudyLocation('1', '#truth-table', weeks, saved), { week: 1, section: 'truth-table', shouldNormalize: false });
   assert.deepEqual(resolveStudyLocation(null, '', weeks, saved), { week: 1, section: 'truth-table', shouldNormalize: true });
-  assert.deepEqual(resolveStudyLocation('2', '#made-up', weeks, saved), { week: 1, section: 'overview', shouldNormalize: true });
+  assert.deepEqual(resolveStudyLocation('2', '#made-up', weeks, saved), { week: 2, section: 'week2-overview', shouldNormalize: true });
   assert.deepEqual(resolveStudyLocation('1', '#missing', weeks, saved), { week: 1, section: 'overview', shouldNormalize: true });
   assert.deepEqual(resolveStudyLocation('1', '', weeks, saved), { week: 1, section: 'overview', shouldNormalize: true });
   assert.deepEqual(resolveStudyLocation(null, '', weeks, saved, 'truth-table'), { week: 1, section: 'truth-table', shouldNormalize: true });
@@ -124,7 +124,11 @@ void test('전체 7주차 모델에서 자료 없는 미래 주차는 메타데�
   assert.equal(weeks.length, 7);
   assert.equal(weeks[0].status, 'ready');
   assert.ok(weeks[0].sections.length > 0);
-  for (const week of weeks.slice(1)) {
+  for (const week of weeks.slice(0, 5)) {
+    assert.equal(week.status, 'ready');
+    assert.ok(week.sections.length > 0);
+  }
+  for (const week of weeks.slice(5)) {
     assert.equal(week.status, 'upcoming');
     assert.deepEqual(week.sections, []);
   }
