@@ -1,4 +1,5 @@
 'use client';
+import { ClaudeStudyNotes, StudyNotesJump } from './claude-study-notes';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -452,6 +453,7 @@ export default function Home() {
         {mobileQueryOpen && <div className="border-t px-4 py-3 md:hidden">{searchBox(true)}</div>}
       </header>
 
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-7"><StudyNotesJump>Lecture 1~7 상세 정리·내 질문 보기 ↓</StudyNotesJump></div>
       <div className="mx-auto grid max-w-[1440px] grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,820px)_270px]">
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] overflow-y-auto border-r border-border/80 p-5 lg:block">
           <a href="https://hyunchanwi.github.io/study-hub/" className="mb-5 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold hover:bg-muted"><ArrowLeft className="size-4" /> Study Hub로 돌아가기</a>
@@ -687,6 +689,7 @@ export default function Home() {
           {activeWeekData.memory && <div className="mt-6 rounded-2xl bg-[#171a37] p-4 text-white"><Sparkles className="size-5 text-amber-300" /><p className="mt-3 text-sm font-bold">오늘의 기억 문장</p><p className="mt-2 text-xs leading-5 text-indigo-100">{activeWeekData.memory}</p></div>}
         </aside>
       </div>
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-7"><ClaudeStudyNotes initialScope="lec1" /></div>
     </main>
   );
 }
