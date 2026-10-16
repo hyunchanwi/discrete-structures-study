@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { lectureSummaries } from '../src/lecture-summaries.ts';
 import { scopeOptions, studyNotes } from '../src/claude-study-data.ts';
 
-test('상세 정리는 강의 전체 흐름과 출처·녹음 상태를 제공한다', () => {
+void test('상세 정리는 강의 전체 흐름과 출처·녹음 상태를 제공한다', () => {
   const scopeIds = scopeOptions.map((scope) => scope.id);
   const coveredScopes = new Set(lectureSummaries.flatMap((lecture) => lecture.scopes));
   assert.deepEqual([...coveredScopes].sort(), ["lec1","lec2","lec3","lec4","lec5","lec6","lec7"].sort());
@@ -22,7 +22,7 @@ test('상세 정리는 강의 전체 흐름과 출처·녹음 상태를 제공�
   }
 });
 
-test('실제 질문 요지와 별도 복습 문제를 구분하고 상세 본문도 검색한다', () => {
+void test('실제 질문 요지와 별도 복습 문제를 구분하고 상세 본문도 검색한다', () => {
   for (const note of studyNotes) {
     assert.ok(note.questionsAsked.length > 0);
     assert.ok(note.questionsAsked.every((question) => question.trim().length > 0));

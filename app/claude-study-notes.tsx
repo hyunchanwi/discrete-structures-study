@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { courseName, scopeOptions, studyNotes } from '../src/claude-study-data';
 import { lectureSummaries as conversationSummaries } from '../src/lecture-summaries';
@@ -23,9 +23,24 @@ export function ClaudeStudyNotes({ initialScope = 'all', locked = false, lecture
   const terms = useMemo(() => query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean), [query]);
   const scopedLectures = useMemo(() => lectureSummaries.filter((lecture) => lectureIds ? lectureIds.includes(lecture.id) : currentScope === 'all' || lecture.scopes.includes(currentScope)), [currentScope, lectureIds]);
   const scopedNotes = useMemo(() => studyNotes.filter((note) => noteScopes ? note.scopes.some((item) => noteScopes.includes(item)) : currentScope === 'all' || note.scopes.includes(currentScope)), [currentScope, noteScopes]);
+  useEffect(() => {
+    const reveal = (event: Event) => {
+      const id = (event as CustomEvent<{ id: string }>).detail?.id;
+      if (!id || (!scopedLectures.some((lecture) => `learning-${lecture.id}` === id) && !scopedNotes.some((note) => `conversation-${note.id}` === id))) return;
+      setQuery('');
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const target = document.getElementById(id);
+        target?.querySelectorAll('details').forEach((details) => { details.open = true; });
+        target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+        target?.focus({ preventScroll: true });
+      }));
+    };
+    window.addEventListener('study-notes-navigate', reveal);
+    return () => window.removeEventListener('study-notes-navigate', reveal);
+  }, [scopedLectures, scopedNotes]);
   const lectures = useMemo(() => scopedLectures.filter((lecture) => {
     const searchable = [lecture.title, lecture.overview, lecture.location, lecture.recordingStatus, ...lecture.sources,
-      ...lecture.sections.flatMap((section) => [section.title, ...section.paragraphs, section.formula, section.example, section.code])].join(' ').toLocaleLowerCase();
+      ...lecture.sections.flatMap((section) => [section.title, ...section.paragraphs, section.formula, section.example, section.code, section.check?.question, section.check?.answer])].join(' ').toLocaleLowerCase();
     return terms.every((term) => searchable.includes(term));
   }), [scopedLectures, terms]);
   const results = useMemo(() => scopedNotes.filter((note) => terms.every((term) =>
@@ -54,8 +69,9 @@ export function ClaudeStudyNotes({ initialScope = 'all', locked = false, lecture
             event.preventDefault();
             document.getElementById(`learning-${lecture.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }}>{lecture.title}</a>)}</nav>
-          {lectures.map((lecture) => <article key={lecture.id} className="claude-notes-card claude-notes-lecture" id={`learning-${lecture.id}`}>
+          {lectures.map((lecture) => <article key={lecture.id} className="claude-notes-card claude-notes-lecture" id={`learning-${lecture.id}`} tabIndex={-1}>
             <h4>{lecture.title}</h4>
+            {lecture.id.startsWith('gpt-symbols-') && <p className="claude-notes-notice">추가 선택 복습 · 기존 필수 섹션 완료 진도에 포함하지 않습니다.</p>}
             <div className="claude-notes-detail">
               <p className="claude-notes-overview">{lecture.overview}</p>
               <p className="claude-notes-source-status"><strong>자료 위치:</strong> {lecture.location}<br /><strong>녹음 근거 상태:</strong> {lecture.recordingStatus}</p>
@@ -65,16 +81,18 @@ export function ClaudeStudyNotes({ initialScope = 'all', locked = false, lecture
                 {section.formula && <pre className="claude-notes-formula">{section.formula}</pre>}
                 {section.example && <p className="claude-notes-example">{section.example}</p>}
                 {section.code && <pre className="claude-notes-code"><code>{section.code}</code></pre>}
+                {section.check && <details className="claude-notes-check"><summary>복습 확인 · {section.check.question}</summary><p>{section.check.answer}</p></details>}
               </section>)}
-              <footer><strong>정리 출처:</strong> {lecture.sources.join(' / ')}<br />{weeklyLectureSummaries.some((item) => item.id === lecture.id) ? '새 자료 기반 정리 / PDF 텍스트·전사 진도 확인 / 이미지 전체 재검증 전' : '과거 Claude 학습 대화를 편집한 정리 / 세부 원본 페이지 재대조 전'}</footer>
+              <footer><strong>정리 출처:</strong> {lecture.sources.join(' / ')}<br />{weeklyLectureSummaries.some((item) => item.id === lecture.id) ? 'GPT 학습 대화 재구성 / 페이지 출처는 대화 인용 / 원본 페이지·이미지 전체 재검증 전 / 수업 진도는 위 녹음 근거 상태 참조' : '과거 Claude 학습 대화를 편집한 정리 / 세부 원본 페이지 재대조 전'}</footer>
             </div>
           </article>)}
         </section>}
-        {noteScopes && results.length === 0 && <p>이 주차에 연결할 실제 Claude 질문은 확인되지 않았습니다. 질문을 임의로 만들지 않고 자료 기반 학습 정리를 제공합니다.</p>}
+        {noteScopes && scopedNotes.length === 0 && <p>이 주차 범위에 연결한 질문·혼동 노트가 없습니다.</p>}
+        {scopedNotes.length > 0 && results.length === 0 && <p>이 범위의 질문·혼동 노트 {scopedNotes.length}개 중 검색어와 일치하는 항목이 없습니다. 검색어를 지우면 다시 볼 수 있습니다.</p>}
         {results.length > 0 && <section aria-labelledby="claude-personal-questions">
           <h3 className="claude-notes-group-title" id="claude-personal-questions">② 내가 질문·헷갈렸던 부분</h3>
           <p>실제 질문의 요지를 개인 식별정보 없이 바꿔 적었습니다. 아래 접힌 확인 문제는 별도로 편집한 복습 문제이며 실제 질문 원문과 구분합니다.</p>
-          {results.map((note) => <article key={note.id} className="claude-notes-card" id={`conversation-${note.id}`}>
+          {results.map((note) => <article key={note.id} className="claude-notes-card" id={`conversation-${note.id}`} tabIndex={-1}>
             <h4><span>{note.chapter}</span>{note.title}</h4>
             <div className="claude-notes-detail">
               <div className="claude-notes-asked"><strong>내가 물었던 질문 · 요지</strong><ul>{note.questionsAsked.map((question) => <li key={question}>{question}</li>)}</ul></div>

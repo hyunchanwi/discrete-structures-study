@@ -183,11 +183,12 @@ export default function Home() {
   const activeWeekData = weeks.find((week) => week.number === activeWeek) ?? firstReadyWeek;
   const currentSections = activeWeekData.sections;
   const currentSectionIds = currentSections.map((section) => section.id);
+  const searchableSections = [...currentSections, ...(activeWeekData.searchSections ?? [])];
   const completed = useMemo(() => new Set(completedByWeek[String(activeWeek)] ?? []), [activeWeek, completedByWeek]);
   const progressState = useMemo(() => ({ version: 2 as const, completedByWeek, lastWeek: activeWeek, lastSection: activeId }), [activeId, activeWeek, completedByWeek]);
   const completedWeeks = useMemo(() => new Set(completedWeekNumbers(progressState, weeks)), [progressState]);
   const currentWeekComplete = currentSections.length > 0 && currentSectionIds.every((id) => completed.has(id));
-  const searchResults = searchStudySections(currentSections, query);
+  const searchResults = searchStudySections(searchableSections, query);
   const progressValue = Math.round((completed.size / Math.max(1, currentSections.length)) * 100);
   const activeIndex = Math.max(0, currentSections.findIndex((section) => section.id === activeId));
   const truthResult = evaluateBinary(operator, p, q);
@@ -298,16 +299,15 @@ export default function Home() {
   }
 
   function navigateTo(id: string, focusContent = false) {
-    if (!currentSectionIds.includes(id)) return;
+    if (!searchableSections.some((section) => section.id === id)) return;
+    window.dispatchEvent(new CustomEvent('study-notes-navigate', { detail: { id } }));
     setActiveId(id);
     const url = new URL(window.location.href);
     url.searchParams.set('week', String(activeWeek));
     url.hash = id;
     window.history.pushState({}, '', url);
     persist(completedByWeek, activeWeek, id);
-    const target = document.getElementById(id);
-    target?.scrollIntoView({ behavior: preferredScrollBehavior(), block: 'start' });
-    if (focusContent) window.requestAnimationFrame(() => target?.focus({ preventScroll: true }));
+    setPendingNavigation({ week: activeWeek, section: id, focus: focusContent, behavior: preferredScrollBehavior() });
   }
 
   function toggleComplete(id: string) {
@@ -361,7 +361,7 @@ export default function Home() {
   }
 
   function selectSearchResult(id: string) {
-    navigateTo(id);
+    navigateTo(id, true);
     setQuery('');
     setSearchOpen(false);
     setMobileQueryOpen(false);
@@ -454,7 +454,7 @@ export default function Home() {
         {mobileQueryOpen && <div className="border-t px-4 py-3 md:hidden">{searchBox(true)}</div>}
       </header>
 
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-7"><StudyNotesJump>Lecture 1~7 상세 정리·내 질문 보기 ↓</StudyNotesJump></div>
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-7"><StudyNotesJump>{activeWeek}주차 상세 정리·내 질문 보기 ↓</StudyNotesJump></div>
       <div className="mx-auto grid max-w-[1440px] grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,820px)_270px]">
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] overflow-y-auto border-r border-border/80 p-5 lg:block">
           <a href="https://hyunchanwi.github.io/study-hub/" className="mb-5 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold hover:bg-muted"><ArrowLeft className="size-4" /> Study Hub로 돌아가기</a>

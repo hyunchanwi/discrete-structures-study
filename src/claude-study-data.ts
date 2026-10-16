@@ -1,6 +1,8 @@
+import { gptStudyNotes } from './gpt-study-data.ts';
+
 export const courseName = "이산구조";
 
-export const studyNotes = [
+const conversationStudyNotes = [
   {
     "id": "study-1",
     "questionsAsked": ["(p∧¬q)→¬r가 p∨q→¬r와 같은 식이야?","최종 오른쪽에는 ¬r이 붙어 있는데?"],
@@ -122,6 +124,8 @@ export const studyNotes = [
   }
 ];
 
+export const studyNotes = [...conversationStudyNotes, ...gptStudyNotes];
+
 export const scopeOptions = [
   {
     "id": "lec1",
@@ -150,5 +154,6 @@ export const scopeOptions = [
   {
     "id": "lec7",
     "label": "Lecture 7 · 함수"
-  }
+  },
+  { id: 'lec9', label: 'Lecture 9 · 기수·가산성·행렬' }
 ];

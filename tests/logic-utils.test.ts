@@ -128,10 +128,11 @@ void test('전체 7주차 모델에서 자료 없는 미래 주차는 메타데�
     assert.equal(week.status, 'ready');
     assert.ok(week.sections.length > 0);
   }
-  for (const week of weeks.slice(5)) {
+  for (const week of weeks.filter((week) => week.number === 6)) {
     assert.equal(week.status, 'upcoming');
     assert.deepEqual(week.sections, []);
   }
+  assert.equal(weeks.find((week) => week.number === 7)?.status, 'ready');
 });
 
 void test('검색은 관련 섹션을 찾고 결과 없음 상태를 구분한다', () => {

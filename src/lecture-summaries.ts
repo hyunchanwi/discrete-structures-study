@@ -4,6 +4,7 @@ export type LectureSection = {
   formula: string;
   example: string;
   code: string;
+  check?: { question: string; answer: string };
 };
 
 export type LectureSummary = {

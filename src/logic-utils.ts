@@ -9,6 +9,7 @@ export type StudyWeekLike = {
   number: number;
   status: 'ready' | 'upcoming';
   sections: { id: string }[];
+  searchSections?: { id: string }[];
 };
 
 export type WeeklyStudyProgress = {
@@ -120,7 +121,7 @@ function firstReadyWeek(weeks: StudyWeekLike[]) {
 }
 
 function validSectionIds(week: StudyWeekLike) {
-  return week.sections.map((section) => section.id);
+  return [...week.sections, ...(week.searchSections ?? [])].map((section) => section.id);
 }
 
 /**
@@ -158,7 +159,7 @@ export function parseWeeklyProgress(
         ? (stored as Record<string, unknown>)[String(week.number)]
         : undefined;
       if (!Array.isArray(candidates)) continue;
-      const ids = validSectionIds(week);
+      const ids = week.sections.map((section) => section.id);
       const completed = candidates.filter(
         (id): id is string => typeof id === 'string' && ids.includes(id),
       );
@@ -187,7 +188,7 @@ export function parseWeeklyProgress(
     legacy = null;
   }
   if (!fallbackWeek || !legacy || typeof legacy !== 'object') return fallback;
-  const migrated = parseProgress(JSON.stringify(legacy), validSectionIds(fallbackWeek));
+  const migrated = parseProgress(JSON.stringify(legacy), fallbackWeek.sections.map((section) => section.id));
   return {
     version: 2,
     completedByWeek: migrated.completed.length

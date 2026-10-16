@@ -1,5 +1,6 @@
-import { weeklyCatalog } from './weekly-catalog.ts';
+import { weeklyCatalog, weeklyLectureSummaries } from './weekly-catalog.ts';
 import { lectureSummaries } from './lecture-summaries.ts';
+import { studyNotes } from './claude-study-data.ts';
 
 export type StudySection = {
   id: string;
@@ -16,6 +17,7 @@ export type StudyWeek = {
   summary: string;
   status: 'ready' | 'upcoming';
   sections: StudySection[];
+  searchSections?: StudySection[];
   memory?: string;
 };
 
@@ -102,16 +104,28 @@ export const weeks: StudyWeek[] = [
     status: 'ready',
     sections: [
       { id: `week${week.number}-overview`, title: '자료와 주차 진도', eyebrow: `WEEK ${week.number}`, summary: week.summary, searchText: week.evidence, source: week.materials.join(' / ') },
-      ...lectureSummaries.filter((lecture) => week.lectureIds.includes(lecture.id)).map((lecture) => ({
+      ...[...lectureSummaries, ...weeklyLectureSummaries].filter((lecture) => week.lectureIds.includes(lecture.id) && !lecture.id.startsWith('gpt-symbols-')).map((lecture) => ({
         id: `learning-${lecture.id}`, title: lecture.title, eyebrow: `WEEK ${week.number}`, summary: lecture.overview,
-        searchText: lecture.sections.map((section) => `${section.title} ${section.paragraphs.join(' ')} ${section.formula}`).join(' '), source: lecture.location,
+        searchText: lecture.sections.map((section) => `${section.title} ${section.paragraphs.join(' ')} ${section.formula} ${section.example} ${section.check?.question ?? ''} ${section.check?.answer ?? ''}`).join(' '), source: lecture.location,
       })),
     ],
     memory: week.summary,
   })),
   { number: 6, title: '조합론과 점화식', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
-  { number: 7, title: '관계와 그래프 이론', summary: '강의자료 준비 중', status: 'upcoming', sections: [] },
 ];
+
+// 추가 선택 복습은 필수 진도와 분리한다. 기존 완료 섹션·주차 판정을 바꾸지 않는다.
+weeks.sort((a, b) => a.number - b.number);
+for (const week of weeks) {
+  const catalog = weeklyCatalog.find((entry) => entry.number === week.number);
+  if (!catalog) continue;
+  const symbols = weeklyLectureSummaries.filter((lecture) => lecture.id.startsWith('gpt-symbols-') && catalog.lectureIds.includes(lecture.id));
+  const notes = studyNotes.filter((note) => note.scopes.some((scope) => catalog.noteScopes.includes(scope)));
+  week.searchSections = [
+    ...symbols.map((lecture): StudySection => ({ id: `learning-${lecture.id}`, title: `${lecture.title} · 추가 선택 복습`, eyebrow: '기호사전', summary: lecture.overview, searchText: lecture.sections.flatMap((section) => [section.title, ...section.paragraphs, section.formula, section.example, section.check?.question ?? '', section.check?.answer ?? '']).join(' '), source: lecture.location })),
+    ...notes.map((note): StudySection => ({ id: `conversation-${note.id}`, title: note.title, eyebrow: '질문·혼동 노트', summary: note.explanation.join(' '), searchText: [note.title, ...note.questionsAsked, ...note.explanation, note.question, note.answer].join(' '), source: note.source })),
+  ];
+}
 
 // 기존 콘텐츠 컴포넌트와 외부 소비자가 1주차 섹션을 계속 참조할 수 있게 한다.
 export const sections = weeks[0].sections;

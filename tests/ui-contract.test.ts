@@ -31,7 +31,7 @@ void test('데스크톱 셸은 왼쪽 주차 지도와 오른쪽 현재 주차 �
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   assert.match(page, /function WeekList/);
   assert.match(page, /SectionList items=\{currentSections\}/);
-  assert.match(page, /searchStudySections\(currentSections, query\)/);
+  assert.match(page, /searchStudySections\(searchableSections, query\)/);
   assert.match(page, /aria-label="전체 주차 목록"/);
   assert.match(page, /전체 학습 진도/);
   assert.match(page, /현재 주차 목차/);

@@ -1,4 +1,5 @@
 import type { LectureSummary } from './lecture-summaries';
+import { gptLectureSummaries, symbolSummaries } from './gpt-study-data.ts';
 
 export const weeklyCatalog = [
   {
@@ -6,7 +7,7 @@ export const weeklyCatalog = [
     "title": "명제논리와 응용",
     "summary": "Lecture 1 · 연산자·함축·진리표",
     "lectureIds": [
-      "discrete-propositions"
+      "discrete-propositions", "gpt-symbols-logic"
     ],
     "noteScopes": [
       "lec1"
@@ -22,7 +23,7 @@ export const weeklyCatalog = [
     "title": "논리적 동치·술어·한정기호",
     "summary": "Lecture 2 · 동치와 논의영역",
     "lectureIds": [
-      "discrete-equivalence"
+      "discrete-equivalence", "gpt-symbols-logic"
     ],
     "noteScopes": [
       "lec2"
@@ -38,7 +39,7 @@ export const weeklyCatalog = [
     "summary": "Lecture 3~4 · 논증의 타당성",
     "lectureIds": [
       "discrete-nested",
-      "discrete-inference"
+      "discrete-inference", "gpt-symbols-logic"
     ],
     "noteScopes": [
       "lec3",
@@ -55,7 +56,7 @@ export const weeklyCatalog = [
     "title": "증명 방법과 전략",
     "summary": "Lecture 5 · 직접·대우·모순·경우",
     "lectureIds": [
-      "discrete-proof"
+      "discrete-proof", "gpt-symbols-logic"
     ],
     "noteScopes": [
       "lec5"
@@ -72,7 +73,7 @@ export const weeklyCatalog = [
     "lectureIds": [
       "discrete-proof",
       "discrete-sets",
-      "discrete-functions"
+      "discrete-functions", "gpt-symbols-logic", "gpt-symbols-sets"
     ],
     "noteScopes": [
       "lec5",
@@ -85,8 +86,17 @@ export const weeklyCatalog = [
       "5주차/DM_lec_7.pdf"
     ],
     "evidence": "5주차 폴더에 세 자료가 있고 5-1은 집합, 5-2는 집합 연산·함수 흐름입니다. 업로드된 장 전체의 복습 정리와 실제 녹음 진도를 구분합니다."
+  },
+  {
+    number: 7,
+    title: '기수·가산성과 행렬',
+    summary: 'Lecture 9 · 정수 가산성 증명과 GPT 추가 학습',
+    lectureIds: ['gpt-cardinality', 'gpt-matrices'],
+    noteScopes: ['lec9'],
+    materials: ['7주차/DM_lec_9.pdf', '7주차/7-1 전사본'],
+    evidence: '7-1 전사본 확인 범위는 기수·단사·전사·정수 가산성까지입니다. 1:08:12에 수업 종료. 유리수·문자열·칸토어 대각선·행렬은 GPT 추가 학습이며 교수 구두 진도 미확인입니다. 페이지 출처는 과거 대화 인용이고 원본 페이지 전체 재검증 전입니다.',
   }
 ];
 
-export const weeklyLectureSummaries: LectureSummary[] = [];
+export const weeklyLectureSummaries: LectureSummary[] = [...gptLectureSummaries, ...symbolSummaries];
 
